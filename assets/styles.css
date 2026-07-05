@@ -1,8 +1,17 @@
 :root{
-    --bg:#0c1424; --bg-2:#0f1a2e; --panel:#111d33;
-    --stroke:rgba(210,222,245,.12); --stroke-soft:rgba(210,222,245,.07);
-    --txt:#eef2fb; --muted:#9fabc6; --muted-2:#7f8bab;
-    --gold:#c9a548; --gold-2:#e6c980; --accent:#2f5db0; --accent-2:#3f74c9; --r:14px;
+    --bg:#0a1120; --bg-2:#0d1728; --panel:#101d34;
+    --stroke:rgba(210,222,245,.14); --stroke-soft:rgba(210,222,245,.07);
+    --txt:#f0f4fc; --muted:#a4b0ca; --muted-2:#7f8bab;
+    --gold:#d0aa4e; --gold-2:#ecd08a; --accent:#3663c4; --accent-2:#4c86e0; --r:14px;
+    /* redesign 2.0 — shared gradients, elevation & motion */
+    --grad-gold:linear-gradient(120deg,var(--gold-2),var(--gold));
+    --grad-accent:linear-gradient(120deg,var(--accent),var(--accent-2));
+    --grad-brand:linear-gradient(120deg,var(--accent-2) 0%,#7aa0ea 45%,var(--gold-2) 100%);
+    --elev-1:0 6px 22px -12px rgba(2,7,18,.6);
+    --elev-2:0 30px 70px -28px rgba(2,7,18,.8);
+    --glass:rgba(13,23,42,.62);
+    --ring:0 0 0 3px color-mix(in srgb,var(--accent) 32%,transparent);
+    --ease:cubic-bezier(.2,.75,.2,1);
   }
   *{margin:0;padding:0;box-sizing:border-box}
   html{scroll-behavior:smooth}
@@ -2018,6 +2027,126 @@
   /* red "delete" button variant */
   .btn.del{background:transparent;border:1px solid rgba(224,104,122,.4);color:#e0687a}
   .btn.del:hover{border-color:#e0687a;background:rgba(224,104,122,.1)}
+
+  /* small inline text button (e.g. reveal masked email) */
+  .lnk-btn{background:none;border:none;color:var(--gold-2);cursor:pointer;font-family:inherit;
+    font-size:12.5px;font-weight:600;padding:0 4px;text-decoration:underline}
+  .lnk-btn:hover{color:var(--gold)}
+
+  /* ======================================================================
+     VISUAL REFRESH 2.0 — cohesive premium identity (mobile + desktop)
+     Appended last so it elevates the shared components across every page:
+     app bar, brand, buttons, panels, inputs, cards, loader, footer.
+     ====================================================================== */
+  @keyframes aurora-pan{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+  @keyframes brand-glow{0%,100%{box-shadow:0 0 0 0 rgba(76,134,224,.0),var(--elev-1)}50%{box-shadow:0 0 22px -2px rgba(76,134,224,.55),var(--elev-1)}}
+  @keyframes float-soft{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+  @keyframes ring-spin{to{transform:rotate(360deg)}}
+  @keyframes shimmer-x{0%{transform:translateX(-120%)}60%,100%{transform:translateX(220%)}}
+
+  /* refined body ambience */
+  body{background-image:
+    radial-gradient(1200px 780px at 88% -12%, rgba(76,134,224,.16), transparent 60%),
+    radial-gradient(950px 640px at -8% 110%, rgba(208,170,78,.10), transparent 55%),
+    radial-gradient(700px 520px at 50% 50%, rgba(76,134,224,.05), transparent 70%);}
+
+  /* app bar — deeper glass + gradient hairline */
+  .appbar{background:color-mix(in srgb,var(--bg) 66%,transparent);backdrop-filter:blur(16px) saturate(1.2);
+    -webkit-backdrop-filter:blur(16px) saturate(1.2);border-bottom:1px solid transparent;
+    background-clip:padding-box;box-shadow:0 1px 0 0 var(--stroke-soft),0 10px 30px -24px rgba(0,0,0,.8)}
+  .appbar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;
+    background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--accent-2) 60%,transparent),color-mix(in srgb,var(--gold-2) 60%,transparent),transparent);opacity:.5}
+  .brand .mark{background:var(--grad-accent);box-shadow:var(--elev-1);animation:brand-glow 4.5s var(--ease) infinite;overflow:hidden;position:relative}
+  .brand .mark img{position:relative;z-index:1}
+  .brand{letter-spacing:.3px}
+
+  /* buttons — premium gradients, glow, sheen sweep */
+  .btn{border-radius:12px;letter-spacing:.2px;transition:transform .16s var(--ease),box-shadow .3s var(--ease),border-color .2s,background .2s,color .2s}
+  .btn.primary{background:var(--grad-accent);box-shadow:0 10px 26px -14px var(--accent),inset 0 1px 0 rgba(255,255,255,.14)}
+  .btn.primary:hover{box-shadow:0 18px 40px -14px var(--accent),inset 0 1px 0 rgba(255,255,255,.18)}
+  .btn.gold{background:var(--grad-gold);color:#1c1503;box-shadow:0 10px 26px -14px rgba(208,170,78,.7),inset 0 1px 0 rgba(255,255,255,.3)}
+  .btn.gold:hover{box-shadow:0 18px 42px -14px rgba(208,170,78,.8)}
+  .btn.ghost{background:color-mix(in srgb,var(--txt) 3%,transparent);border-color:var(--stroke)}
+  .btn.ghost:hover{border-color:color-mix(in srgb,var(--gold) 55%,transparent);color:var(--txt);
+    background:color-mix(in srgb,var(--gold) 8%,transparent)}
+  .btn.primary::after,.btn.gold::after{content:"";position:absolute;top:0;bottom:0;width:32%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);
+    transform:translateX(-120%);pointer-events:none}
+  .btn.primary:hover::after,.btn.gold:hover::after{animation:shimmer-x 1.1s var(--ease)}
+
+  /* panels & cards — soft glass, elevation, hover lift */
+  .panel{background:linear-gradient(180deg,color-mix(in srgb,var(--panel) 94%,transparent),var(--bg-2));
+    box-shadow:var(--elev-1);border-radius:18px}
+  .panel::before{height:2px;background:var(--grad-brand);opacity:.7}
+  .mp-card,.xp-card,.feat,.exp-card,.install-card,.adm-user,.adm-citem,.adm-stat,.notif-item{
+    transition:transform .22s var(--ease),box-shadow .3s var(--ease),border-color .2s}
+  .mp-card:hover,.xp-card:hover,.feat:hover,.adm-stat:hover{transform:translateY(-4px);
+    box-shadow:var(--elev-2);border-color:color-mix(in srgb,var(--accent) 34%,transparent)}
+  .mp-card{border-radius:16px;box-shadow:var(--elev-1)}
+
+  /* inputs — refined focus ring */
+  .field input,.field textarea,.mini-select,.adm-search input{border-radius:12px;transition:border-color .2s,box-shadow .2s,background .2s}
+  .field input:focus,.field textarea:focus,.mini-select:focus,.adm-search input:focus{
+    border-color:var(--accent-2);box-shadow:var(--ring)}
+
+  /* user chip — pill */
+  .user-chip{border:1px solid var(--stroke);border-radius:100px;padding:5px 12px 5px 6px;
+    background:color-mix(in srgb,var(--txt) 4%,transparent);transition:border-color .2s,background .2s}
+  .user-chip:hover{border-color:color-mix(in srgb,var(--gold) 45%,transparent)}
+
+  /* premium loader — dual gradient ring */
+  .pro-loader .ring{border:3px solid transparent;border-top-color:var(--accent-2);border-right-color:var(--gold-2);
+    animation:ring-spin 1s linear infinite;filter:drop-shadow(0 0 8px rgba(76,134,224,.5))}
+  .pro-loader .pl-logo{animation:float-soft 3s var(--ease) infinite}
+
+  /* footer — refined */
+  .site-foot{border-top:1px solid var(--stroke-soft);background:color-mix(in srgb,var(--bg) 40%,transparent)}
+
+  /* nicer scrollbar */
+  *{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--accent) 45%,transparent) transparent}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:linear-gradient(var(--accent),var(--gold));border-radius:100px;border:2px solid transparent;background-clip:padding-box}
+  ::selection{background:color-mix(in srgb,var(--gold) 34%,transparent)}
+
+  /* reusable animated aurora background for hero/section headers */
+  .aurora-bg{position:relative;isolation:isolate}
+  .aurora-bg::before{content:"";position:absolute;inset:-2px;z-index:-1;border-radius:inherit;
+    background:linear-gradient(120deg,rgba(54,99,196,.22),rgba(122,160,234,.14),rgba(236,208,138,.16),rgba(54,99,196,.22));
+    background-size:280% 280%;animation:aurora-pan 14s ease-in-out infinite;filter:blur(2px)}
+
+  @media (prefers-reduced-motion: reduce){
+    .brand .mark,.pro-loader .pl-logo,.aurora-bg::before,.btn.primary::after,.btn.gold::after{animation:none!important}
+  }
+
+  /* light-mode adjustments for the refresh */
+  html[data-mode="light"] .btn.ghost{background:rgba(18,28,48,.05)}
+  html[data-mode="light"] .appbar{background:color-mix(in srgb,#ffffff 72%,transparent)}
+  html[data-mode="light"] .site-foot{background:color-mix(in srgb,#ffffff 50%,transparent)}
+
+  /* cookie-consent notice */
+  .cookie-bar{position:fixed;left:14px;right:14px;bottom:14px;z-index:70;max-width:740px;margin:0 auto;
+    background:color-mix(in srgb,var(--panel) 90%,transparent);border:1px solid var(--stroke);border-radius:16px;
+    box-shadow:var(--elev-2);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;
+    transform:translateY(160%);opacity:0;transition:transform .42s var(--ease),opacity .42s var(--ease)}
+  .cookie-bar.show{transform:translateY(0);opacity:1}
+  .cookie-bar .ck-in{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .cookie-bar .ck-ic{flex:none;display:grid;place-items:center;color:var(--gold-2)}
+  .cookie-bar .ck-ic svg{width:26px;height:26px}
+  .cookie-bar .ck-tx{flex:1;min-width:210px;font-size:13px;color:var(--muted);line-height:1.75}
+  .cookie-bar .ck-tx a{color:var(--gold-2);text-decoration:none;font-weight:600}
+  .cookie-bar .ck-tx a:hover{text-decoration:underline}
+  .cookie-bar .ck-acts{display:flex;gap:8px}
+  .cookie-bar .ck-btn{border:1px solid var(--stroke);background:transparent;color:var(--muted);cursor:pointer;
+    font-family:inherit;font-weight:600;font-size:13px;padding:10px 20px;border-radius:100px;transition:.18s}
+  .cookie-bar .ck-btn.ok{background:var(--grad-accent);color:#fff;border-color:transparent;
+    box-shadow:0 8px 22px -12px var(--accent)}
+  .cookie-bar .ck-btn.ok:hover{box-shadow:0 14px 32px -12px var(--accent);transform:translateY(-1px)}
+  .cookie-bar .ck-btn.gh:hover{border-color:var(--gold);color:var(--txt)}
+  @media(max-width:560px){
+    .cookie-bar{left:10px;right:10px;bottom:10px;padding:14px}
+    .cookie-bar .ck-acts{width:100%}
+    .cookie-bar .ck-btn{flex:1}
+  }
 
   @media(max-width:600px){
     .adm-user,.adm-nrow{flex-direction:column;align-items:stretch}

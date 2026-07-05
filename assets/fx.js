@@ -76,3 +76,54 @@
     tick();
   }, 1200);
 })();
+
+/* ---------------------------------------------------------------------------
+   Cookie-consent notice — shown once, remembered locally. Loaded on every page
+   (this file is included site-wide). elgoharyX uses only essential storage
+   (login session + theme preference), so this is an informational consent.
+--------------------------------------------------------------------------- */
+(function () {
+  'use strict';
+  var KEY = 'apb_cookie_consent';
+  try { if (localStorage.getItem(KEY)) return; } catch (e) { return; }
+
+  var COOKIE_IC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M12 3a9 9 0 1 0 9 9 4 4 0 0 1-4-4 3 3 0 0 1-3-3 3 3 0 0 0-2-2Z"/>'
+    + '<circle cx="9" cy="10" r="1"/><circle cx="14" cy="14" r="1"/><circle cx="10.5" cy="15" r="1"/></svg>';
+
+  function close(val) {
+    try { localStorage.setItem(KEY, val); } catch (e) {}
+    var bar = document.getElementById('cookieBar');
+    if (!bar) return;
+    bar.classList.remove('show');
+    setTimeout(function () { if (bar.parentNode) bar.parentNode.removeChild(bar); }, 320);
+  }
+
+  function show() {
+    if (document.getElementById('cookieBar') || !document.body) return;
+    var bar = document.createElement('div');
+    bar.className = 'cookie-bar';
+    bar.id = 'cookieBar';
+    bar.setAttribute('role', 'dialog');
+    bar.setAttribute('aria-label', 'إشعار ملفات تعريف الارتباط');
+    bar.innerHTML =
+      '<div class="ck-in">' +
+        '<span class="ck-ic">' + COOKIE_IC + '</span>' +
+        '<div class="ck-tx">يستخدم <b>elgoharyX</b> ملفات تعريف الارتباط (الكوكيز) الأساسية لحفظ جلسة دخولك وتفضيلاتك وتحسين تجربتك. ' +
+          '<a href="privacy.html">سياسة الخصوصية</a></div>' +
+        '<div class="ck-acts">' +
+          '<button class="ck-btn ok" id="ckAccept">موافق</button>' +
+          '<button class="ck-btn gh" id="ckDecline">رفض</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(bar);
+    // setTimeout (not rAF) so the entrance still fires if the tab is throttled
+    setTimeout(function () { bar.classList.add('show'); }, 30);
+    document.getElementById('ckAccept').onclick = function () { close('1'); };
+    document.getElementById('ckDecline').onclick = function () { close('0'); };
+  }
+
+  function boot() { setTimeout(show, 900); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();

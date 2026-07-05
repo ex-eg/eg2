@@ -640,12 +640,17 @@ const auth = getAuth(app);
   }
   const SESSION_KEY='apb_session_uid';
   const USER_KEY='apb_user';
+  const REFRESH_KEY='apb_refreshed';        // sessionStorage: did we refresh from the DB this session?
+  const ADMIN_EMAIL_KEY='apb_admin_email';  // sessionStorage: cached admin email (avoids a read per page)
   const saveSession =uid=>{ try{ localStorage.setItem(SESSION_KEY,uid); }catch{} };
   const getSession  =()=>{ try{ return localStorage.getItem(SESSION_KEY); }catch{ return null; } };
-  const clearSession=()=>{ try{ localStorage.removeItem(SESSION_KEY); localStorage.removeItem(USER_KEY); }catch{} };
+  const clearSession=()=>{ try{ localStorage.removeItem(SESSION_KEY); localStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(REFRESH_KEY); sessionStorage.removeItem(ADMIN_EMAIL_KEY); sessionStorage.removeItem('apb_admin_unlocked'); }catch{} };
   /* cache the logged-in user locally so pages render INSTANTLY without waiting on
-     a (possibly slow) network read of users/<uid>. Refreshed in the background. */
-  const cacheUser=u=>{ try{ localStorage.setItem(USER_KEY, JSON.stringify({uid:u.uid,username:u.username,email:u.email||'',photo:u.photo||'',premium:!!u.premium})); }catch{} };
+     a (possibly slow) network read of users/<uid>. We load the record from the
+     database only ONCE per browser session (see init) — every later page in the
+     same visit is served from this local cache, sharply cutting database reads. */
+  const cacheUser=u=>{ try{ localStorage.setItem(USER_KEY, JSON.stringify({uid:u.uid,username:u.username,email:u.email||'',photo:u.photo||'',premium:!!u.premium,cachedAt:Date.now()})); }catch{} };
   const getCachedUser=()=>{ try{ return JSON.parse(localStorage.getItem(USER_KEY)||'null'); }catch{ return null; } };
 
   /* ---------- shared-link password protection ----------
@@ -2989,11 +2994,31 @@ const auth = getAuth(app);
 
   let adminEmail = undefined; // undefined = not loaded yet, null = none
   async function loadAdminEmail(){
+    // session cache: read the admin email from the DB only once per browser session
+    try{ const c=sessionStorage.getItem(ADMIN_EMAIL_KEY); if(c!==null){ adminEmail = c||null; return adminEmail; } }catch(e){}
     try{ const s=await get(child(ref(db),'config/adminEmail')); adminEmail = s.exists()? String(s.val()).trim().toLowerCase() : null; }
     catch(e){ adminEmail = null; }
+    try{ sessionStorage.setItem(ADMIN_EMAIL_KEY, adminEmail||''); }catch(e){}
     return adminEmail;
   }
   const isAdmin = () => !!(currentUser && adminEmail && (currentUser.email||'').trim().toLowerCase()===adminEmail);
+
+  /* ---- admin panel password gate (hides the admin email behind a password
+     that the admin sets from inside the panel). Stored hashed in config/adminGate,
+     verified client-side; unlock is remembered for the browser session only. ---- */
+  const hashAdminPass = (salt,pass)=>sha256((salt||'')+'::admin::'+String(pass||''));
+  async function loadAdminGate(){
+    try{ const s=await get(child(ref(db),'config/adminGate'));
+      return s.exists() && s.val() && s.val().hash ? s.val() : null; }catch(e){ return null; }
+  }
+  const ADMIN_UNLOCK_KEY='apb_admin_unlocked';
+  const adminUnlocked   =()=>{ try{ return sessionStorage.getItem(ADMIN_UNLOCK_KEY)==='1'; }catch{ return false; } };
+  const markAdminUnlocked=()=>{ try{ sessionStorage.setItem(ADMIN_UNLOCK_KEY,'1'); }catch{} };
+  const clearAdminUnlock =()=>{ try{ sessionStorage.removeItem(ADMIN_UNLOCK_KEY); }catch{} };
+  /* mask an email for display: keep first 2 chars + full domain (ex•••@gmail.com) */
+  const maskEmail = e=>{ const s=String(e||''); const at=s.indexOf('@'); if(at<1) return '•••';
+    const head=s.slice(0,Math.min(2,at)); return head+'•••'+s.slice(at); };
+
   async function getPremium(uid){ try{ const s=await get(child(ref(db),'premium/'+uid)); return s.exists()?s.val():null; }catch(e){ return null; } }
   const premiumActive = p => !!(p && p.active && (!p.expires || p.expires>Date.now()));
   const isPremium = () => !!(currentUser && currentUser.premium);
@@ -3092,32 +3117,100 @@ const auth = getAuth(app);
     wireAppbar();
     if(adminEmail===undefined) await loadAdminEmail();
     const fbAuthed = !!(auth && auth.currentUser);
-    // "set admin email" card — saves straight to config/adminEmail
+    const adminGateObj = await loadAdminGate();   // panel password (hides the admin email)
+    const adminGateSet = !!adminGateObj;
+    // "set admin email" + "panel password" cards
     const setupCard = () => `<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
         <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">إعداد بريد الأدمن</h3>
         <div class="sub" style="margin-bottom:14px">اكتب بريد الأدمن واضغط حفظ — يُخزَّن في قاعدة البيانات تلقائياً.</div>
-        ${adminEmail?`<div class="pm-note ok" style="margin-bottom:12px">الأدمن الحالي: <b dir="ltr">${esc(adminEmail)}</b></div>`:`<div class="pm-note" style="margin-bottom:12px">لم يُضبط الأدمن بعد — احفظ بريدك لتصبح الأدمن.</div>`}
+        ${!adminEmail
+          ? `<div class="pm-note" style="margin-bottom:12px">لم يُضبط الأدمن بعد — احفظ بريدك لتصبح الأدمن.</div>`
+          : (isAdmin()
+            ? `<div class="pm-note ok" style="margin-bottom:12px">الأدمن الحالي: <b dir="ltr" id="admEmailShow" data-full="${esc(adminEmail)}" data-shown="0">${esc(maskEmail(adminEmail))}</b> <button class="lnk-btn" id="admEmailReveal" type="button">إظهار</button></div>`
+            : `<div class="pm-note ok" style="margin-bottom:12px">تم ضبط الأدمن بالفعل. 🔒</div>`)}
         ${fbAuthed?`
           <div class="field"><label>بريد الأدمن</label><input id="admEmailInp" dir="ltr" value="${esc((currentUser.email||'').trim().toLowerCase())}"/></div>
           <button class="btn primary" id="admSave" style="width:100%">حفظ بريد الأدمن</button>
           <div class="pm-note" id="admMsg"></div>
         `:`<div class="gate-note" style="display:block">لتعيين الأدمن يجب تسجيل الدخول عبر <b>Google</b> (حساب Firebase). اخرج ثم ادخل بزر «المتابعة بحساب Google» بنفس بريد الأدمن، ثم ارجع هنا واحفظه.</div>`}
-      </div>`;
+      </div>
+      ${isAdmin()?`<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">🔒 كلمة مرور لوحة الأدمن</h3>
+        <div class="sub" style="margin-bottom:14px">${adminGateSet?'اللوحة محمية بكلمة مرور — تُطلب عند فتح القسم لإخفاء بريد الأدمن. يمكنك تغييرها أو إزالتها.':'أضف كلمة مرور لحماية اللوحة وإخفاء بريد الأدمن — تُطلب عند فتح هذا القسم.'}</div>
+        <div class="field"><label>كلمة المرور الجديدة</label><input id="admPass1" type="password" dir="ltr" placeholder="6 أحرف على الأقل" autocomplete="new-password"/></div>
+        <div class="field"><label>تأكيد كلمة المرور</label><input id="admPass2" type="password" dir="ltr" placeholder="أعد كتابتها" autocomplete="new-password"/></div>
+        <button class="btn primary" id="admPassSave" style="width:100%">${adminGateSet?'تغيير كلمة المرور':'حفظ كلمة المرور'}</button>
+        ${adminGateSet?`<button class="btn del" id="admPassRemove" style="width:100%;margin-top:8px">إزالة كلمة المرور</button>`:''}
+        <div class="pm-note" id="admPassMsg"></div>
+      </div>`:''}`;
     const wireSetup = () => {
-      const b=$('#admSave'); if(!b) return;
-      b.onclick=async()=>{
+      // reveal / hide the masked admin email
+      const rv=$('#admEmailReveal');
+      if(rv) rv.onclick=()=>{ const b=$('#admEmailShow'); if(!b) return;
+        const showing=b.dataset.shown==='1';
+        b.textContent = showing ? maskEmail(b.dataset.full) : b.dataset.full;
+        b.dataset.shown = showing?'0':'1'; rv.textContent = showing?'إظهار':'إخفاء'; };
+      // save the admin email
+      const b=$('#admSave');
+      if(b) b.onclick=async()=>{
         const em=($('#admEmailInp').value||'').trim().toLowerCase(), msg=$('#admMsg');
         if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ msg.className='pm-note'; msg.textContent='بريد غير صحيح'; return; }
         b.disabled=true; const old=b.textContent; b.textContent='جارٍ الحفظ…';
-        try{ await set(ref(db,'config/adminEmail'), em); adminEmail=em; toast('تم حفظ بريد الأدمن ✓'); showAdmin(); }
+        try{ await set(ref(db,'config/adminEmail'), em); adminEmail=em; try{ sessionStorage.setItem(ADMIN_EMAIL_KEY, em); }catch(e){} toast('تم حفظ بريد الأدمن ✓'); showAdmin(); }
         catch(e){ console.error(e); msg.className='pm-note'; msg.textContent='تعذّر الحفظ — لازم تكون داخل بجوجل، وتحفظ بريدك أنت (أول مرة) أو تكون الأدمن الحالي.'; b.disabled=false; b.textContent=old; }
       };
+      // save / change the panel password
+      const ps=$('#admPassSave');
+      if(ps) ps.onclick=async()=>{
+        const p1=($('#admPass1').value||''), p2=($('#admPass2').value||''), msg=$('#admPassMsg');
+        if(p1.length<6){ msg.className='pm-note'; msg.textContent='كلمة المرور 6 أحرف على الأقل'; return; }
+        if(p1!==p2){ msg.className='pm-note'; msg.textContent='كلمتا المرور غير متطابقتين'; return; }
+        ps.disabled=true; const old=ps.textContent; ps.textContent='جارٍ الحفظ…';
+        try{ const salt=shortId(16); const hash=await hashAdminPass(salt,p1);
+          await set(ref(db,'config/adminGate'), { salt, hash, at:Date.now() });
+          markAdminUnlocked(); toast('تم حفظ كلمة المرور ✓'); showAdmin();
+        }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent='تعذّر الحفظ — تأكد أنك أدمن (Google) وأن القواعد المحدّثة منشورة'; ps.disabled=false; ps.textContent=old; }
+      };
+      // remove the panel password
+      const pr=$('#admPassRemove');
+      if(pr) pr.onclick=async()=>{ if(!confirm('إزالة كلمة مرور اللوحة؟ سيصبح بريد الأدمن ظاهراً لمن يفتح القسم.'))return;
+        try{ await remove(ref(db,'config/adminGate')); clearAdminUnlock(); toast('تمت إزالة كلمة المرور'); showAdmin(); }
+        catch(e){ console.error(e); toast('تعذّر — تأكد أنك أدمن'); } };
     };
     if(!isAdmin()){
       $('#app').innerHTML = appbar('admin') + `<div class="wrap">${setupCard()}
         <div class="mp-empty" style="max-width:600px;margin:0 auto">هذه اللوحة للأدمن فقط. بعد حفظ بريدك بالأعلى (وأنت داخل بجوجل) ستصبح الأدمن مباشرة.</div>
       </div>` + drawer('admin');
       wireAppbar(); wireSetup(); return;
+    }
+
+    /* ---------- password gate (hides the admin email behind a password) ---------- */
+    if(adminGateSet && !adminUnlocked()){
+      $('#app').innerHTML = appbar('admin') + `<div class="wrap">
+        <div class="lock-wrap"><div class="lock-card">
+          <div class="lock-ic"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.4"/></svg></div>
+          <h2 class="lock-title">لوحة الأدمن محمية بكلمة مرور</h2>
+          <p class="lock-sub">أدخل كلمة مرور لوحة الأدمن للمتابعة.</p>
+          <div class="lock-err" id="admGateErr"></div>
+          <div class="field"><input id="admGatePass" type="password" placeholder="كلمة المرور" autocomplete="off" style="text-align:center;letter-spacing:2px"/></div>
+          <button class="btn primary" id="admGateGo">دخول</button>
+          <a class="lock-home" href="${urlHome()}">العودة للرئيسية</a>
+        </div></div>
+      </div>` + drawer('admin');
+      wireAppbar();
+      const inp=$('#admGatePass'), err=$('#admGateErr'), go=$('#admGateGo');
+      const attempt=async()=>{
+        err.textContent='';
+        const v=inp.value; if(!v){ err.textContent='أدخل كلمة المرور'; return; }
+        go.disabled=true; const old=go.textContent; go.textContent='جارٍ التحقق…';
+        const h=await hashAdminPass(adminGateObj.salt||'', v);
+        if(h===adminGateObj.hash){ markAdminUnlocked(); showAdmin(); }
+        else{ err.textContent='كلمة المرور غير صحيحة'; go.disabled=false; go.textContent=old; inp.value=''; inp.focus(); }
+      };
+      go.onclick=attempt;
+      inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); attempt(); } });
+      inp.focus();
+      return;
     }
 
     /* ---------- tabbed control center ---------- */
@@ -3426,18 +3519,25 @@ const auth = getAuth(app);
   (async function init(){
     const uid=getSession();
     if(!uid){ route(); return; }
-    loadAdminEmail();                                  // background: enables the admin nav for the admin
+    loadAdminEmail();                                  // session-cached: reads the DB only on the first page of a session
     // refresh premium status in the background & cache it for the NEXT navigation only —
     // we never flip the gate mid-view, so the current page stays fully consistent.
-    const applyPrem=()=>getPremium(uid).then(pp=>{ try{ const c=getCachedUser()||{}; c.premium=premiumActive(pp); localStorage.setItem(USER_KEY, JSON.stringify(c)); }catch(e){} }).catch(()=>{});
+    const applyPrem=()=>getPremium(uid).then(pp=>{ try{ const c=getCachedUser()||{}; c.premium=premiumActive(pp); c.cachedAt=Date.now(); localStorage.setItem(USER_KEY, JSON.stringify(c)); }catch(e){} }).catch(()=>{});
+    let refreshed=false; try{ refreshed = sessionStorage.getItem(REFRESH_KEY)==='1'; }catch(e){}
     const cached=getCachedUser();
     if(cached && cached.uid===uid){
-      // instant render from cache; refresh the record quietly in the background
-      currentUser=cached; route(); applyPrem();
-      loadUserRecord(uid).then(rec=>{ if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||'مستخدم', photo:rec.photo||''}; cacheUser(currentUser); } }).catch(()=>{});
+      // instant render from the local cache — no database read needed
+      currentUser=cached; route();
+      // touch the database at most ONCE per browser session; later pages use the cache
+      if(!refreshed){
+        try{ sessionStorage.setItem(REFRESH_KEY,'1'); }catch(e){}
+        applyPrem();
+        loadUserRecord(uid).then(rec=>{ if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||'مستخدم', photo:rec.photo||''}; cacheUser(currentUser); } }).catch(()=>{});
+      }
       return;
     }
-    // no cache (old session): wait for the record but never hang the page > 8s
+    // no cache (first visit / new device): load the record once, then cache it
+    try{ sessionStorage.setItem(REFRESH_KEY,'1'); }catch(e){}
     let rec=null;
     try{ rec=await Promise.race([loadUserRecord(uid), new Promise(r=>setTimeout(()=>r(null),8000))]); }catch(e){}
     if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||'مستخدم', photo:rec.photo||''}; cacheUser(currentUser); }
