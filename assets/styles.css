@@ -1488,3 +1488,182 @@
   .xp-meta .xp-av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px;flex:none}
   .xp-meta .dot{width:3px;height:3px;border-radius:50%;background:var(--muted);opacity:.6}
   .xp-empty{text-align:center;color:var(--muted);padding:56px 20px;border:1px dashed var(--stroke);border-radius:16px}
+
+  /* =====================================================================
+     PREMIUM MOTION + IDENTITY LAYER — applies across every page
+     ===================================================================== */
+  :root{ --ease:cubic-bezier(.2,.75,.2,1); }
+
+  /* animated ambient aurora behind all content */
+  @media (prefers-reduced-motion: no-preference){
+    body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+      background:
+        radial-gradient(48vw 48vw at 12% 16%, rgba(47,93,176,.20), transparent 62%),
+        radial-gradient(42vw 42vw at 88% 10%, rgba(201,165,72,.13), transparent 60%),
+        radial-gradient(52vw 52vw at 78% 94%, rgba(63,116,201,.16), transparent 62%);
+      animation:auroraDrift 24s var(--ease) infinite alternate;will-change:transform}
+    @keyframes auroraDrift{0%{transform:translate3d(0,0,0) scale(1)}100%{transform:translate3d(-3%,3%,0) scale(1.12)}}
+  }
+  main,#app,.site-foot{position:relative;z-index:1}
+
+  /* scroll reveal (toggled by assets/fx.js) */
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .75s var(--ease),transform .75s var(--ease)}
+  .reveal.in{opacity:1;transform:none}
+  .reveal.r-left{transform:translateX(-26px)} .reveal.r-right{transform:translateX(26px)} .reveal.r-zoom{transform:scale(.93)}
+  .reveal.in.r-left,.reveal.in.r-right,.reveal.in.r-zoom{transform:none}
+  .reveal[data-d="1"]{transition-delay:.08s}.reveal[data-d="2"]{transition-delay:.16s}
+  .reveal[data-d="3"]{transition-delay:.24s}.reveal[data-d="4"]{transition-delay:.32s}
+  .reveal[data-d="5"]{transition-delay:.40s}.reveal[data-d="6"]{transition-delay:.48s}
+  @media (prefers-reduced-motion: reduce){ .reveal{opacity:1!important;transform:none!important} }
+
+  /* animated gradient text */
+  .grad-text{background:linear-gradient(100deg,var(--gold-2),#ffffff 28%,var(--accent-2) 52%,var(--gold-2));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+    background-size:220% auto;animation:gradShift 7s linear infinite}
+  @keyframes gradShift{to{background-position:220% center}}
+  @media (prefers-reduced-motion: reduce){ .grad-text{animation:none} }
+
+  /* button motion: press feedback, lift + gloss sweep */
+  .btn{position:relative;overflow:hidden;transition:transform .15s var(--ease),box-shadow .28s,border-color .2s,background .2s,color .2s}
+  .btn:active{transform:translateY(1px) scale(.99)}
+  .btn.primary:hover,.btn.gold:hover{transform:translateY(-2px);box-shadow:0 16px 34px -14px rgba(201,165,72,.55)}
+  .btn.primary::after,.btn.gold::after{content:"";position:absolute;top:0;left:-120%;width:58%;height:100%;pointer-events:none;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.38),transparent);transform:skewX(-18deg)}
+  .btn.primary:hover::after,.btn.gold:hover::after{animation:sheen .9s ease}
+  @keyframes sheen{to{left:135%}}
+
+  /* animated brand identity mark */
+  .brand .mark{position:relative;transition:transform .3s var(--ease)}
+  .brand:hover .mark{transform:rotate(-6deg) scale(1.07)}
+  @media (prefers-reduced-motion: no-preference){
+    .brand .mark::after{content:"";position:absolute;inset:-2px;border-radius:inherit;z-index:-1;opacity:.55;
+      background:conic-gradient(from 0deg,var(--gold),transparent 35%,var(--accent-2) 60%,transparent 85%,var(--gold));
+      animation:spinGlow 5s linear infinite;filter:blur(2px)}
+    @keyframes spinGlow{to{transform:rotate(360deg)}}
+  }
+
+  /* generic card hover polish */
+  .feat,.xp-card,.mp-card,.badm-post,.sup-link{transition:transform .28s var(--ease),box-shadow .3s,border-color .25s,background .2s}
+  .feat:hover{transform:translateY(-6px);box-shadow:0 32px 64px -36px rgba(0,0,0,.72);border-color:rgba(201,165,72,.5)}
+
+  /* animated underline links */
+  .ul-anim{position:relative}
+  .ul-anim::after{content:"";position:absolute;right:0;bottom:-3px;width:0;height:2px;background:var(--gold);transition:width .3s var(--ease)}
+  .ul-anim:hover::after{width:100%}
+
+  /* floating + pulsing utilities */
+  @media (prefers-reduced-motion: no-preference){
+    .floaty{animation:floaty 6s ease-in-out infinite}
+    .floaty.f2{animation-duration:8s;animation-delay:-2s}
+    .floaty.f3{animation-duration:7s;animation-delay:-4s}
+    @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+    .pulse-dot{animation:pulseDot 2.2s ease-in-out infinite}
+    @keyframes pulseDot{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
+  }
+
+  /* seamless marquee strip */
+  .marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);
+    mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+  .marquee-track{display:flex;gap:14px;width:max-content;animation:marq 34s linear infinite}
+  .marquee:hover .marquee-track{animation-play-state:paused}
+  @keyframes marq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  @media (prefers-reduced-motion: reduce){ .marquee-track{animation:none} }
+
+  /* entrance animation for app views (viewer / blog) */
+  #app>.viewer,#app>.blog{animation:fadeUp .6s var(--ease) both}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+  /* premium install banner shimmer */
+  .pwa-banner{border-radius:16px;box-shadow:0 30px 72px -26px rgba(0,0,0,.82)}
+  .pwa-banner .pwa-install{position:relative;overflow:hidden}
+  @media (prefers-reduced-motion: no-preference){
+    .pwa-banner .pwa-install::after{content:"";position:absolute;top:0;left:-120%;width:55%;height:100%;
+      background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);transform:skewX(-18deg);
+      animation:sheen 2.6s ease-in-out infinite}
+  }
+
+  /* =====================================================================
+     BLOG EXTRAS — news ticker, search box, sidebar, 3D tilt, entrance anim
+     ===================================================================== */
+  /* news ticker */
+  .blog-ticker{font-family:var(--b-bf)}
+  .tk-marquee{display:flex;align-items:stretch;border-bottom:1px solid var(--b-stroke);background:var(--b-panel);overflow:hidden}
+  .tk-label{flex:none;display:flex;align-items:center;padding:0 16px;font-weight:700;font-size:12.5px;color:#fff;
+    background:linear-gradient(135deg,var(--b-accent),var(--b-accent2));white-space:nowrap;line-height:42px}
+  .tk-scroll{flex:1;overflow:hidden;min-width:0;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);
+    mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+  .tk-track{display:inline-flex;align-items:center;gap:14px;white-space:nowrap;padding:0 16px;width:max-content;
+    line-height:42px;animation:tkmarq 28s linear infinite}
+  .tk-marquee:hover .tk-track{animation-play-state:paused}
+  @keyframes tkmarq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .tk-item{color:var(--b-text);font-size:13.5px;font-weight:500}
+  .tk-sep{color:var(--b-accent);font-size:9px}
+  .tk-badge{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--b-stroke);background:var(--b-panel)}
+  .tk-flag{flex:none;background:#d63a4a;color:#fff;font-weight:800;font-size:12px;padding:4px 12px;border-radius:6px;letter-spacing:1px;animation:tkblink 1.6s steps(1) infinite}
+  @keyframes tkblink{50%{opacity:.5}}
+  .tk-one{color:var(--b-text);font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tk-dots{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:11px 16px;border-bottom:1px solid var(--b-stroke);background:var(--b-panel)}
+  .tk-dots .tk-label{background:none;color:var(--b-accent2);padding:0;font-weight:700;font-size:12px;line-height:1}
+  .tk-list{display:flex;gap:18px;flex-wrap:wrap}
+  .tk-dots .tk-item{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--b-muted)}
+  .tk-dot{width:7px;height:7px;border-radius:50%;background:var(--b-accent2);display:inline-block}
+  @media (prefers-reduced-motion: reduce){ .tk-track{animation:none} }
+
+  /* search box */
+  .blog-search{display:flex;align-items:center;gap:10px;margin:0 0 26px;padding:11px 15px;color:var(--b-muted);
+    background:var(--b-panel);border:1px solid var(--b-stroke);transition:border-color .2s,box-shadow .2s}
+  .blog-search input{flex:1;font-family:inherit;font-size:15px;color:var(--b-text);background:none;border:none;outline:none;min-width:0}
+  .blog-search input::placeholder{color:var(--b-muted)}
+  .blog-search svg{flex:none;color:var(--b-accent2)}
+  .blog-search:focus-within{border-color:var(--b-accent)}
+  .bs-pill{border-radius:100px}
+  .bs-box{border-radius:11px}
+  .bs-underline{border:none;border-bottom:2px solid var(--b-stroke);background:none;border-radius:0;padding:9px 4px}
+  .bs-glow{border-radius:12px}
+  .bs-glow:focus-within{box-shadow:0 0 0 4px color-mix(in srgb,var(--b-accent) 20%,transparent),0 0 26px -8px var(--b-accent)}
+
+  /* layout with sidebar */
+  .blog-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:clamp(22px,3vw,44px);align-items:start}
+  @media(max-width:860px){.blog-layout{grid-template-columns:1fr}}
+  .blog-main{min-width:0}
+  .blog-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:16px}
+  @media(max-width:860px){.blog-side{position:static}}
+  .sb-block{padding:16px 18px;border:1px solid var(--b-stroke);border-radius:var(--b-rad);background:var(--b-panel)}
+  .sb-block h4{font-family:var(--b-hf);font-size:16px;color:var(--b-head);margin-bottom:12px}
+  .sb-author{display:flex;align-items:center;gap:12px}
+  .sb-author .av{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--b-hero);color:#fff;font-family:var(--b-hf);font-weight:700;font-size:18px;flex:none}
+  .sb-author b{color:var(--b-head);font-family:var(--b-hf);font-size:16px}
+  .sb-author span{display:block;color:var(--b-muted);font-size:12px}
+  .sb-posts{display:flex;flex-direction:column;gap:11px}
+  .sb-post{display:flex;align-items:flex-start;gap:10px;cursor:pointer;text-decoration:none;color:var(--b-text);transition:color .15s}
+  .sb-post:hover{color:var(--b-accent2)}
+  .sb-idx{flex:none;width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--b-accent2);background:color-mix(in srgb,var(--b-accent) 14%,transparent)}
+  .sb-pt{font-size:13.5px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .sb-tags{display:flex;flex-wrap:wrap;gap:7px}
+  .sb-tag{font-size:12px;color:var(--b-muted);border:1px solid var(--b-stroke);padding:4px 11px;border-radius:100px}
+  .sb-about{color:var(--b-muted);font-size:13px;line-height:1.8}
+  .sb-empty{color:var(--b-muted);font-size:13px}
+  .sb-minimal .sb-block{border:none;background:none;padding:8px 0;border-top:1px solid var(--b-stroke);border-radius:0}
+  .sb-bordered .sb-block{background:none;border:1px solid var(--b-accent)}
+
+  /* 3D tilt */
+  .btilt .bpost-card,.btilt .blog-feat{transition:transform .18s ease,box-shadow .3s,border-color .25s;transform-style:preserve-3d;will-change:transform}
+
+  /* entrance animations */
+  @media (prefers-reduced-motion: no-preference){
+    .banim .blog-feat,.banim .bpost-card{opacity:0;animation-duration:.7s;animation-fill-mode:forwards;animation-timing-function:cubic-bezier(.2,.75,.2,1)}
+    .banim-fade .blog-feat,.banim-fade .bpost-card{animation-name:baFade}
+    .banim-rise .blog-feat,.banim-rise .bpost-card{animation-name:baRise}
+    .banim-zoom .blog-feat,.banim-zoom .bpost-card{animation-name:baZoom}
+    .banim-slide .blog-feat,.banim-slide .bpost-card{animation-name:baSlide}
+    .banim-flip .blog-feat,.banim-flip .bpost-card{animation-name:baFlip}
+    .banim .bpost-card:nth-child(1){animation-delay:.04s}.banim .bpost-card:nth-child(2){animation-delay:.12s}
+    .banim .bpost-card:nth-child(3){animation-delay:.2s}.banim .bpost-card:nth-child(4){animation-delay:.28s}
+    .banim .bpost-card:nth-child(5){animation-delay:.36s}.banim .bpost-card:nth-child(6){animation-delay:.44s}
+    @keyframes baFade{to{opacity:1}}
+    @keyframes baRise{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
+    @keyframes baZoom{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}
+    @keyframes baSlide{from{opacity:0;transform:translateX(42px)}to{opacity:1;transform:none}}
+    @keyframes baFlip{from{opacity:0;transform:perspective(700px) rotateX(-18deg)}to{opacity:1;transform:none}}
+  }

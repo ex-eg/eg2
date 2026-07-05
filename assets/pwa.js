@@ -60,10 +60,40 @@
     setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 320);
   }
 
+  function toastMsg(m) {
+    var t = document.getElementById('toast');
+    if (t) { t.textContent = m; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 1900); }
+  }
+
+  // Public install trigger — wired to any [data-install] button on any page.
+  function triggerInstall() {
+    if (isStandalone) { toastMsg('التطبيق مثبّت بالفعل ✓'); return; }
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.finally(function () { deferredPrompt = null; document.body.classList.remove('can-install'); });
+      return;
+    }
+    if (isIOS) {
+      buildBanner('<b>ثبّت على الآيفون</b><span>اضغط زر المشاركة <span class="pwa-ico">&#x2191;</span> ثم اختر «إضافة إلى الشاشة الرئيسية».</span>', false);
+      return;
+    }
+    buildBanner('<b>تثبيت التطبيق</b><span>افتح قائمة المتصفح ثم اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».</span>', false);
+  }
+  window.elgoInstall = triggerInstall;
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-install]') : null;
+    if (b) { e.preventDefault(); triggerInstall(); }
+  });
+  window.addEventListener('load', function () {
+    if (isStandalone) document.body.classList.add('is-standalone');
+    else if (isIOS) document.body.classList.add('can-install');
+  });
+
   // ----- Android / Chromium: native install flow -----
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault();
     deferredPrompt = e;
+    if (document.body) document.body.classList.add('can-install');
     if (isStandalone || dismissed()) return;
     var b = buildBanner(
       '<b>ثبّت التطبيق على جهازك</b><span>للوصول السريع والعمل دون اتصال — دون متجر تطبيقات.</span>',

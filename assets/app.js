@@ -1399,11 +1399,7 @@ const db = getDatabase(app);
         $('#ovDesc').textContent = 'رابط عام للعرض بالأسفل — وبالأسفل «رابط المشاركة للتعديل» لمن يعدّل معك.';
         $('#outLink').value=full; $('#openLink').href=full;
         $('#ov').classList.add('show');
-
-        note.textContent='جارٍ اختصار الرابط…';
-        const sh=await shorten(full);
-        if(sh){ $('#outLink').value=sh; $('#openLink').href=sh; note.textContent='✓ تم اختصار الرابط تلقائياً عبر is.gd'; }
-        else note.textContent=/^https?:/i.test(full)?'تعذّر الاختصار — هذا هو الرابط الكامل':'الاختصار التلقائي يعمل بعد رفع الموقع على استضافة (https)';
+        note.textContent='';
       }catch(e){
         console.error(e); toast('تعذّر الحفظ — سجّل الدخول وتحقّق من قواعد قاعدة البيانات');
       }finally{ btn.disabled=false; btn.innerHTML=old; }
@@ -1494,10 +1490,10 @@ const db = getDatabase(app);
   }
 
   /* ======================================================================
-     BLOG MODULE — 50 professional design themes, posts, viewer & builder
+     BLOG MODULE — 100 professional design themes, posts, viewer & builder
      ====================================================================== */
   /* Each design: name + palette. Font scheme (bf) and hero style (bh) are
-     assigned across the set so all 50 feel genuinely distinct & professional. */
+     assigned across the set so all 100 feel genuinely distinct & professional. */
   const _bd=(name,light,bg,panel,text,muted,accent,accent2)=>({name,light,bg,panel,text,muted,accent,accent2});
   const BLOG_DESIGNS_RAW = [
     _bd('ميدنايت','0',  '#0c1424','#111d33','#eef2fb','#9fabc6','#c9a548','#e6c980'),
@@ -1550,6 +1546,57 @@ const db = getDatabase(app);
     _bd('وردي هادئ','1','#fff5f7','#fbe7ec','#3d1622','#8a5a68','#c14d6b','#e28aa0'),
     _bd('تركواز داكن','0','#03181a','#0a2428','#e0fbfb','#93c8c8','#1ac0c0','#5fe0e0'),
     _bd('أبيض تحريري','1','#ffffff','#f2f2f3','#18181b','#6b6b70','#27272a','#52525b'),
+    /* ---- 50 more professional themes (51–100) ---- */
+    _bd('كربون','0',    '#0a0c10','#141821','#eef1f6','#9aa2b0','#e0b23a','#ffd76a'),
+    _bd('ثلج ناعم','1', '#fbfcfe','#eef2f8','#1a2230','#5c6678','#3b62c4','#6f8ee0'),
+    _bd('غابة عميقة','0','#06140e','#0c2018','#e6fbf0','#93c4ab','#159a5e','#4fd699'),
+    _bd('ياقوت داكن','0','#180509','#240a10','#ffe6ec','#cf9aa6','#b01236','#f0537a'),
+    _bd('ذهب رملي','1', '#fbf7ee','#efe6d2','#352a17','#786a50','#94651f','#c89a34'),
+    _bd('محيط ليلي','0','#03101c','#081e30','#e0f2ff','#93b6cf','#1284c0','#54c8f4'),
+    _bd('بنفسج ملكي','0','#0d0722','#150e34','#eee6ff','#ab9cd0','#6a2fd0','#a878ec'),
+    _bd('فحم دافئ','0', '#0e0d0c','#1a1815','#f4f2ee','#a8a29a','#e69a3a','#ffc26a'),
+    _bd('توت داكن','0', '#150612','#22102a','#ffe6f6','#cf9ec6','#a3106a','#e850a4'),
+    _bd('زيتوني','1',   '#f5f7ec','#e6ecd4','#2a2f16','#646a4c','#6e7a24','#a4b444'),
+    _bd('سماوي فاتح','1','#f0f9ff','#dceffb','#0e2c40','#4a6c82','#1f8fd0','#5fc0f0'),
+    _bd('رمادي فحمي','0','#0d0e10','#181a1e','#eef0f4','#a2a6ae','#7f9cff','#b4c4ff'),
+    _bd('مرجاني','0',   '#1a0a0a','#261210','#fff0ec','#d3aaa2','#e0503a','#ff8e70'),
+    _bd('عاجي دافئ','1','#fdf9f2','#f1e8d8','#33291c','#7a6a54','#9a6a2a','#cc9848'),
+    _bd('أزرق فولاذي','0','#070c18','#0e1830','#e6ecf8','#98a6c2','#2a55c0','#6288ec'),
+    _bd('زمردي فاتح','1','#eefcf4','#d8f2e4','#0e3a2a','#4a7a64','#12a06a','#4fd0a0'),
+    _bd('خمري داكن','0','#170710','#22101c','#fbe8f0','#cba6b6','#901048','#dc4886'),
+    _bd('عنبري','0',    '#170f04','#241810','#fef2df','#cbb488','#e8961a','#ffcf5f'),
+    _bd('نيلي','0',     '#080a24','#101438','#e8eaff','#a0a4d4','#3838c0','#7a7aec'),
+    _bd('وردي فاتح','1','#fff5f9','#fbe4ee','#40182a','#8a6072','#c84d80','#ec8ab0'),
+    _bd('فيروزي عميق','0','#03181c','#0a262c','#dcfbfc','#8fc8ca','#12b0b0','#5fe4e4'),
+    _bd('أسود لامع','0','#08080a','#121216','#f0f1f4','#a4a6ac','#d4d8e0','#ffffff'),
+    _bd('حجر رملي','1', '#f7f5f0','#e9e4d8','#2e2a20','#6c6656','#8a6a3a','#bc9860'),
+    _bd('أزرق سماوي','0','#04101f','#0a2036','#e4f0fb','#96acc6','#1f6ad0','#5f9cf0'),
+    _bd('ليموني','0',   '#0f1405','#1a220a','#f4ffe2','#bed098','#84b024','#c4f050'),
+    _bd('أوركيدي','1',  '#fbf4fe','#eddef6','#361a40','#725a82','#9a34c4','#c47ce8'),
+    _bd('كهرماني','0',  '#151007','#221912','#fdf3e0','#cbb488','#d89a24','#f4c45f'),
+    _bd('كاكاو داكن','0','#140c08','#201610','#f6ece2','#bfa892','#a06a3a','#d09860'),
+    _bd('جينزي','1',    '#f2f6fc','#e0e9f5','#1c2f52','#586a88','#3558a0','#7090cc'),
+    _bd('نعناعي داكن','0','#04140f','#0a221a','#e2fbf0','#8fc4ac','#1aa878','#5fd8ac'),
+    _bd('سلموني فاتح','1','#fff6f2','#fbe6dc','#492c20','#8a6558','#d06040','#f4a080'),
+    _bd('أزرق داكن جداً','0','#05091a','#0a1230','#e6ecfb','#96a2c4','#3050b0','#6f8ce8'),
+    _bd('أخضر طحلبي','0','#0c1206','#161e0a','#eef4e0','#b0bc90','#6e8a2a','#aac858'),
+    _bd('يوسفي','0',    '#170e05','#241610','#fff0df','#d0ac88','#e07818','#ffa64f'),
+    _bd('خوخي وردي','1','#fff5f6','#fbe6ea','#43222c','#8a626c','#c05870','#eca0b4'),
+    _bd('بحري ساطع','0','#03141c','#0a242e','#dcf4fc','#8fbccb','#1298c4','#54d0f0'),
+    _bd('أرجواني عميق','0','#0e0620','#160e32','#efe6ff','#ac9ed0','#7328c4','#ab74e8'),
+    _bd('ذهبي داكن','0','#12100c','#1e1a12','#faf2e2','#bcae8e','#b8912f','#e6c063'),
+    _bd('فضي فاتح','1', '#f6f7f9','#e6e9ee','#232833','#5e6472','#5a6c8c','#90a4c4'),
+    _bd('برقوقي','0',   '#140a1c','#1e1230','#f0e6fb','#b6a4cf','#7434c4','#ac74e4'),
+    _bd('جليدي','1',    '#f2fbfe','#e2f2f9','#123240','#587885','#2a92b4','#6fc6de'),
+    _bd('صحراوي','0',   '#150f07','#221810','#faf2e4','#c8b090','#d0a04c','#ecc484'),
+    _bd('كحلي ملكي','0','#0a1026','#12183a','#e8eefb','#98a6c6','#2a5ec0','#5f92ec'),
+    _bd('وردي عتيق','1','#fdf4f6','#f6e4ea','#3f1a26','#88586a','#bc506e','#e488a4'),
+    _bd('تركوازي فاتح','1','#eefcfc','#d6f2f2','#0e3838','#4a7878','#12aaaa','#4fd6d6'),
+    _bd('رصاصي','1',    '#f4f5f7','#e6e8ec','#22262e','#5c6270','#4c5a74','#8494b0'),
+    _bd('برتقالي محروق','0','#170c06','#241410','#ffeee2','#d0a690','#e0602a','#ff9660'),
+    _bd('أخضر بحري','0','#031614','#0a2422','#dcf6f2','#8fc4be','#12a094','#4fd4c6'),
+    _bd('نبيذي فاخر','0','#160810','#221020','#fbe8f2','#cba4b8','#9a1a58','#dc4c92'),
+    _bd('أزرق مخملي','0','#070a1a','#0e142e','#e6eafb','#98a2c4','#3448b8','#7480e4'),
   ];
   const _BF=['serif','amiri','mixed','sans','serif','mono'];
   const _BH=['cover','band','center','split','mag'];
@@ -1563,6 +1610,16 @@ const db = getDatabase(app);
   }));
   const BLOG_BY_ID = Object.fromEntries(BLOG_DESIGNS.map(d=>[d.id,d]));
   const blogDesign = id => BLOG_BY_ID[id] || BLOG_DESIGNS[0];
+  /* extra blog customization options (3D, entrance animation, search box, sidebar, news ticker) */
+  const BLOG_ANIMS   = [{id:'none',name:'بدون'},{id:'fade',name:'ظهور ناعم'},{id:'rise',name:'صعود'},{id:'zoom',name:'تكبير'},{id:'slide',name:'انزلاق جانبي'},{id:'flip',name:'انقلاب'}];
+  const BLOG_SEARCH  = [{id:'off',name:'بدون'},{id:'pill',name:'كبسولة'},{id:'box',name:'صندوق'},{id:'underline',name:'خط سفلي'},{id:'glow',name:'متوهّج'}];
+  const BLOG_SIDEBAR = [{id:'none',name:'بدون'},{id:'cards',name:'بطاقات'},{id:'minimal',name:'بسيط'},{id:'bordered',name:'مؤطّر'}];
+  const BLOG_TICKER  = [{id:'none',name:'بدون'},{id:'marquee',name:'شريط متحرك'},{id:'badge',name:'شارة «عاجل»'},{id:'dots',name:'نقاط وامضة'}];
+  const bAnim    = d => { const v=d.anim||'none'; return v!=='none'?('banim banim-'+v):''; };
+  const bTilt    = d => d.threeD ? 'btilt' : '';
+  const bSearchStyle  = d => d.searchStyle||'off';
+  const bSidebarStyle = d => d.sidebarStyle||'none';
+  const bTickerStyle  = d => d.tickerStyle||'none';
   (function injectBlogCSS(){
     const css = BLOG_DESIGNS.map(d=>{
       const stroke = d.light ? 'rgba(20,30,50,.12)' : 'rgba(210,222,245,.12)';
@@ -1752,6 +1809,62 @@ const db = getDatabase(app);
         <div class="bpost-meta">${date?`<span>${date}</span><span class="dot"></span>`:''}<span>${blogReadTime(p.body)}</span></div>
       </div></article>`;
   }
+  /* ---- optional blog elements: news ticker, search box, sidebar ---- */
+  function blogTicker(d){
+    const style=bTickerStyle(d); if(style==='none') return '';
+    const posts=blogPosts(d); if(!posts.length) return '';
+    const titles=posts.slice(0,8).map(p=>esc(p.title||'مقالة'));
+    if(style==='marquee'){
+      const items=titles.map(t=>`<span class="tk-item">${t}</span>`).join('<span class="tk-sep">◆</span>');
+      return `<div class="blog-ticker tk-marquee"><span class="tk-label">آخر الأخبار</span>
+        <div class="tk-scroll"><div class="tk-track">${items}<span class="tk-sep">◆</span>${items}</div></div></div>`;
+    }
+    if(style==='badge'){
+      return `<div class="blog-ticker tk-badge"><span class="tk-flag">عاجل</span><span class="tk-one">${titles[0]}</span></div>`;
+    }
+    const items=titles.slice(0,5).map(t=>`<span class="tk-item"><i class="tk-dot pulse-dot"></i>${t}</span>`).join('');
+    return `<div class="blog-ticker tk-dots"><span class="tk-label">آخر الأخبار</span><div class="tk-list">${items}</div></div>`;
+  }
+  function blogSearchBox(d){
+    const style=bSearchStyle(d); if(style==='off') return '';
+    return `<div class="blog-search bs-${style}">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" class="blog-search-input" placeholder="ابحث في المقالات…" aria-label="بحث في المقالات"/></div>`;
+  }
+  function blogSidebar(d,posts){
+    const style=bSidebarStyle(d); if(style==='none') return '';
+    const recent=posts.slice(0,5).map((p,i)=>`<a class="sb-post" data-post="${posts.indexOf(p)}"><span class="sb-idx">${i+1}</span><span class="sb-pt">${esc(p.title||'مقالة')}</span></a>`).join('')
+      || '<span class="sb-empty">لا مقالات بعد</span>';
+    const tags=[...new Set(posts.map(p=>p.tag).filter(Boolean))].slice(0,12);
+    const tagHtml=tags.length?`<div class="sb-block"><h4>التصنيفات</h4><div class="sb-tags">${tags.map(t=>`<span class="sb-tag">${esc(t)}</span>`).join('')}</div></div>`:'';
+    const about=d.about?`<div class="sb-block"><h4>عن المدونة</h4><p class="sb-about">${esc(d.about)}</p></div>`:'';
+    const author=`<div class="sb-block sb-author">${blogAvatar(d.author,'av')}<div><b>${esc(d.author||'الكاتب')}</b><span>${esc(d.authorEn||'')||'مدونة على elgoharyX'}</span></div></div>`;
+    return `<aside class="blog-side sb-${style}">
+      ${author}
+      <div class="sb-block"><h4>أحدث المقالات</h4><div class="sb-posts">${recent}</div></div>
+      ${tagHtml}${about}
+    </aside>`;
+  }
+  function wireBlogTilt(root){
+    root.querySelectorAll('.bpost-card, .blog-feat').forEach(card=>{
+      card.addEventListener('mousemove',e=>{
+        const r=card.getBoundingClientRect();
+        const px=(e.clientX-r.left)/r.width-0.5, py=(e.clientY-r.top)/r.height-0.5;
+        card.style.transform=`perspective(820px) rotateX(${(-py*6).toFixed(2)}deg) rotateY(${(px*8).toFixed(2)}deg) translateY(-4px)`;
+      });
+      card.addEventListener('mouseleave',()=>{ card.style.transform=''; });
+    });
+  }
+  function wireBlogIndex(id,d){
+    const root=$('#app');
+    root.querySelectorAll('[data-post]').forEach(el=>el.onclick=()=>renderArticle(id,d,+el.dataset.post));
+    const inp=root.querySelector('.blog-search-input');
+    if(inp) inp.addEventListener('input',()=>{ const q=inp.value.trim().toLowerCase();
+      root.querySelectorAll('.blog-grid .bpost-card, .blog-feat').forEach(card=>{
+        const t=(card.textContent||'').toLowerCase(); card.style.display=(!q||t.includes(q))?'':'none'; });
+    });
+    if(d.threeD) wireBlogTilt(root);
+  }
   function renderBlogIndex(id,d){
     const dz = blogShell(d);
     const posts = blogPosts(d);
@@ -1775,11 +1888,16 @@ const db = getDatabase(app);
         <div class="bf-au">${blogAvatar(d.author,'av')}<div><b>${esc(d.author||'الكاتب')}</b><span>${esc(d.authorEn||'')||'مدونة على elgoharyX'}</span></div></div>
         <div class="bf-copy">© 2026 <b>${esc(d.title||'')}</b> — بُنيت عبر <a href="${urlHome()}">elgoharyX</a></div>
       </div></footer>`;
-    $('#app').innerHTML = `<div class="blog ${dz.id} bf-${dz.bf} bh-${dz.bh}">
-      ${blogTop(d,dz)}${blogHero(d,dz)}
-      <div class="blog-wrap">${feat}${grid}${about}</div>
+    const hasSide = bSidebarStyle(d)!=='none';
+    const main = `${blogSearchBox(d)}${feat}${grid}${about}`;
+    const layout = hasSide
+      ? `<div class="blog-layout"><div class="blog-main">${main}</div>${blogSidebar(d,posts)}</div>`
+      : main;
+    $('#app').innerHTML = `<div class="blog ${dz.id} bf-${dz.bf} bh-${dz.bh} ${bAnim(d)} ${bTilt(d)}">
+      ${blogTop(d,dz)}${blogTicker(d)}${blogHero(d,dz)}
+      <div class="blog-wrap">${layout}</div>
       ${foot}</div>`;
-    $('#app').querySelectorAll('[data-post]').forEach(el=>el.onclick=()=>renderArticle(id,d,+el.dataset.post));
+    wireBlogIndex(id,d);
     window.scrollTo(0,0);
   }
   function renderArticle(id,d,idx){
@@ -1922,11 +2040,13 @@ const db = getDatabase(app);
   }
 
   /* ---------- blog builder state ---------- */
-  const BLOG_EMPTY = { title:'', subtitle:'', author:'', authorEn:'', about:'', cover:'', logo:'', design:'bd1', posts:[] };
+  const BLOG_EMPTY = { title:'', subtitle:'', author:'', authorEn:'', about:'', cover:'', logo:'', design:'bd1',
+    threeD:false, anim:'none', searchStyle:'off', sidebarStyle:'none', tickerStyle:'none', posts:[] };
   const BLOG_SAMPLE = {
     title:'مدوّنة الفكر والمعرفة', subtitle:'مقالات في العلم والثقافة والتطوير الذاتي — تُنشر بعناية لتثري عقلك.',
     author:'أ. محمد الجوهري', authorEn:'Mohamed Elgohary', about:'مساحة معرفية أنشرها لمشاركة أفكاري وقراءاتي وتجاربي مع كل باحث عن المعرفة.',
     cover:'', logo:'', design:'bd1',
+    threeD:true, anim:'rise', searchStyle:'pill', sidebarStyle:'cards', tickerStyle:'marquee',
     posts:[
       {id:'p1',title:'كيف تبني عادة القراءة اليومية',tag:'تطوير ذاتي',date:Date.now(),cover:'',published:true,excerpt:'خطوات عملية مبنية على علم النفس السلوكي لتحويل القراءة إلى عادة راسخة تلازمك مدى الحياة.',body:'## البداية الصغيرة\nابدأ بصفحة واحدة يومياً. الهدف ليس الكمية بل الاستمرارية.\n\n## اربطها بعادة قائمة\nاقرأ بعد قهوة الصباح مباشرة؛ العادة القديمة تصبح تذكيراً للعادة الجديدة.\n\n> من قرأ صفحة كل يوم قرأ مكتبة في عمره.\n\n## تتبّع تقدّمك\nسجّل ما تقرأه، فالتقدّم المرئي يغذّي الحافز.'},
       {id:'p2',title:'الذكاء الاصطناعي ومستقبل التعليم',tag:'تقنية',date:Date.now(),cover:'',published:true,excerpt:'كيف تُعيد نماذج الذكاء الاصطناعي تشكيل طريقة تعلّمنا، وما الفرص والمخاطر التي تحملها؟',body:'## تعليم مخصّص للجميع\nيتيح الذكاء الاصطناعي مساراً تعليمياً يناسب كل طالب على حدة.\n\n## دور المعلّم يتغيّر\nلا يختفي المعلّم، بل يتحوّل إلى موجّه وملهم.\n\n## تحديات يجب الانتباه لها\nالخصوصية والاعتماد المفرط والفجوة الرقمية قضايا تحتاج معالجة.'},
@@ -1963,7 +2083,7 @@ const db = getDatabase(app);
       if(!s.exists()){ toast('المدونة غير موجودة'); showBlogAdmin(); return; }
       const d=s.val();
       blogState={...BLOG_EMPTY};
-      ['title','subtitle','author','authorEn','about','cover','logo','design'].forEach(k=>{ if(d[k]!=null) blogState[k]=d[k]; });
+      ['title','subtitle','author','authorEn','about','cover','logo','design','threeD','anim','searchStyle','sidebarStyle','tickerStyle'].forEach(k=>{ if(d[k]!=null) blogState[k]=d[k]; });
       blogState.posts = Array.isArray(d.posts)?d.posts.filter(Boolean).map(p=>({...p})):[];
       if(!BLOG_BY_ID[blogState.design]) blogState.design='bd1';
       blogEditingId=id;
@@ -2027,6 +2147,32 @@ const db = getDatabase(app);
             </div>
           </div>
         </details>
+
+        <details class="acc">
+          <summary><span class="sum-t">${UICON.cube} مؤثرات وعناصر المدونة</span></summary>
+          <div class="acc-body">
+            <div class="opt-row">
+              <div><div class="lbl">مؤثر ثلاثي الأبعاد (3D)</div><div class="desc">تميل بطاقات المقالات مع حركة المؤشر</div></div>
+              <label class="switch"><input type="checkbox" id="f-b-threeD" ${s.threeD?'checked':''}><span class="slider"></span></label>
+            </div>
+            <div class="opt-row">
+              <div><div class="lbl">حركة الظهور (أنيميشن)</div><div class="desc">تظهر بها المقالات عند فتح المدونة</div></div>
+              <select id="f-b-anim" class="mini-select">${BLOG_ANIMS.map(a=>`<option value="${a.id}" ${a.id===(s.anim||'none')?'selected':''}>${a.name}</option>`).join('')}</select>
+            </div>
+            <div class="opt-row">
+              <div><div class="lbl">شكل مربع البحث</div><div class="desc">مربع بحث داخل المقالات</div></div>
+              <select id="f-b-searchStyle" class="mini-select">${BLOG_SEARCH.map(a=>`<option value="${a.id}" ${a.id===bSearchStyle(s)?'selected':''}>${a.name}</option>`).join('')}</select>
+            </div>
+            <div class="opt-row">
+              <div><div class="lbl">تصميم القائمة الجانبية</div><div class="desc">أحدث المقالات والتصنيفات وعن المدونة</div></div>
+              <select id="f-b-sidebarStyle" class="mini-select">${BLOG_SIDEBAR.map(a=>`<option value="${a.id}" ${a.id===bSidebarStyle(s)?'selected':''}>${a.name}</option>`).join('')}</select>
+            </div>
+            <div class="opt-row">
+              <div><div class="lbl">شريط آخر الأخبار</div><div class="desc">شريط بأحدث عناوين مقالاتك أعلى المدونة</div></div>
+              <select id="f-b-tickerStyle" class="mini-select">${BLOG_TICKER.map(a=>`<option value="${a.id}" ${a.id===bTickerStyle(s)?'selected':''}>${a.name}</option>`).join('')}</select>
+            </div>
+          </div>
+        </details>
         </div>
 
         <div class="bpane" data-pane="articles">
@@ -2075,7 +2221,15 @@ const db = getDatabase(app);
 
     wireAppbar();
 
-    const repaint=()=>{ const el=$('#blogPrev'); if(el){ el.innerHTML=`<div class="blog ${blogDesign(blogState.design).id} bf-${blogDesign(blogState.design).bf} bh-${blogDesign(blogState.design).bh}" style="min-height:auto">${blogTop(blogState,blogDesign(blogState.design))}${blogHero(blogState,blogDesign(blogState.design))}<div class="blog-wrap">${previewBody(blogState)}</div></div>`; } };
+    const repaint=()=>{
+      const el=$('#blogPrev'); if(!el) return;
+      const d=blogState, dz=blogDesign(d.design), posts=blogPosts(d);
+      const hasSide=bSidebarStyle(d)!=='none';
+      const main=`${blogSearchBox(d)}${previewBody(d)}`;
+      const layout=hasSide?`<div class="blog-layout"><div class="blog-main">${main}</div>${blogSidebar(d,posts)}</div>`:main;
+      el.innerHTML=`<div class="blog ${dz.id} bf-${dz.bf} bh-${dz.bh} ${bAnim(d)} ${bTilt(d)}" style="min-height:auto">${blogTop(d,dz)}${blogTicker(d)}${blogHero(d,dz)}<div class="blog-wrap">${layout}</div></div>`;
+      if(d.threeD) wireBlogTilt(el);
+    };
     function previewBody(d){
       const posts=blogPosts(d); if(!posts.length) return `<div class="blog-empty">أضف مقالات لتظهر هنا.</div>`;
       const feat=posts[0], rest=posts.slice(1);
@@ -2100,6 +2254,12 @@ const db = getDatabase(app);
     });
     const bs=$('#bdSearch'); if(bs) bs.oninput=()=>{ const q=bs.value.trim();
       $('#bdPicker').querySelectorAll('.bd-swatch').forEach(el=>{ el.style.display=el.dataset.name.includes(q)?'':'none'; }); };
+
+    // 3D / animation / search / sidebar / ticker options
+    const chkThree=$('#f-b-threeD'); if(chkThree) chkThree.onchange=()=>{ blogState.threeD=chkThree.checked; repaint(); };
+    [['anim'],['searchStyle'],['sidebarStyle'],['tickerStyle']].forEach(([k])=>{
+      const el=$('#f-b-'+k); if(el) el.onchange=()=>{ blogState[k]=el.value; repaint(); };
+    });
 
     // cover / logo upload
     const wireUp=(btnId,fileId,noteId,key)=>{
@@ -2240,10 +2400,7 @@ const db = getDatabase(app);
         $('#bovDesc').textContent = 'هذا هو رابط مدونتك الدائم — شاركه مع من تريد.';
         $('#bOutLink').value=full; $('#bOpenLink').href=full;
         $('#bov').classList.add('show');
-        note.textContent='جارٍ اختصار الرابط…';
-        const sh=await shorten(full);
-        if(sh){ $('#bOutLink').value=sh; $('#bOpenLink').href=sh; note.textContent='✓ تم اختصار الرابط تلقائياً'; }
-        else note.textContent=/^https?:/i.test(full)?'تعذّر الاختصار — هذا هو الرابط الكامل':'الاختصار التلقائي يعمل بعد رفع الموقع على استضافة (https)';
+        note.textContent='';
       }catch(e){
         console.error(e); toast('تعذّر الحفظ — سجّل الدخول وتحقّق من قواعد قاعدة البيانات');
       }finally{ btn.disabled=false; btn.innerHTML=old; }
