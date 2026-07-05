@@ -639,9 +639,14 @@ const auth = getAuth(app);
     try{ const s=await get(child(ref(db),'emails/'+encEmail(email))); return s.exists()?s.val():null; }catch{ return null; }
   }
   const SESSION_KEY='apb_session_uid';
+  const USER_KEY='apb_user';
   const saveSession =uid=>{ try{ localStorage.setItem(SESSION_KEY,uid); }catch{} };
   const getSession  =()=>{ try{ return localStorage.getItem(SESSION_KEY); }catch{ return null; } };
-  const clearSession=()=>{ try{ localStorage.removeItem(SESSION_KEY); }catch{} };
+  const clearSession=()=>{ try{ localStorage.removeItem(SESSION_KEY); localStorage.removeItem(USER_KEY); }catch{} };
+  /* cache the logged-in user locally so pages render INSTANTLY without waiting on
+     a (possibly slow) network read of users/<uid>. Refreshed in the background. */
+  const cacheUser=u=>{ try{ localStorage.setItem(USER_KEY, JSON.stringify({uid:u.uid,username:u.username,email:u.email||'',photo:u.photo||''})); }catch{} };
+  const getCachedUser=()=>{ try{ return JSON.parse(localStorage.getItem(USER_KEY)||'null'); }catch{ return null; } };
 
   /* ---------- shared-link password protection ----------
      The creator can set an optional password. We store {viewSalt, viewPassHash}
@@ -741,6 +746,11 @@ const auth = getAuth(app);
   const userAvatar=(cls='avatar-sm')=> (currentUser&&currentUser.photo)
     ? `<span class="${cls} has-img"><img src="${esc(currentUser.photo)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()"/></span>`
     : `<span class="${cls}">${esc(initials(currentUser?currentUser.username:'؟'))}</span>`;
+  /* skeleton placeholders shown while lists load (shimmer) */
+  const skelCard=()=>`<div class="skel-card"><div class="skel skel-cover"></div><div class="skel-body">`
+    +`<div class="skel skel-chip"></div><div class="skel skel-line w90"></div><div class="skel skel-line w60"></div>`
+    +`<div class="skel-foot"><span class="skel skel-av"></span><span class="skel skel-line w40" style="flex:1"></span></div></div></div>`;
+  const skelGrid=(n=6)=>`<div class="skel-grid">${Array.from({length:n},skelCard).join('')}</div>`;
   function appbar(active){
     const right = currentUser ? `
         <button class="btn ghost ab-only" data-act="mode" title="الوضع" style="padding:9px 12px">${modeIcon()}</button>
@@ -919,7 +929,7 @@ const auth = getAuth(app);
         if(email){ try{ await set(ref(db,'emails/'+encEmail(email)), uid); }catch(e){} }
       }
       currentUser = { uid, email:rec.email||email, username:rec.username||'مستخدم', photo:rec.photo||'' };
-      saveSession(uid);
+      saveSession(uid); cacheUser(currentUser);
       toast('تم تسجيل الدخول ✓'); route();
     }catch(e){
       console.error(e); if(err) err.textContent=oauthError(e);
@@ -984,7 +994,7 @@ const auth = getAuth(app);
           await set(ref(db,'usernames/'+uname.toLowerCase()),uid);
           await set(ref(db,'emails/'+encEmail(email)),uid);
           currentUser={uid,email,username:uname,photo:''};
-          saveSession(uid);
+          saveSession(uid); cacheUser(currentUser);
           toast('تم إنشاء الحساب ✓'); route();
         }else{
           const uid=await emailToUid(email);
@@ -994,7 +1004,7 @@ const auth = getAuth(app);
           const h=await hashPass(rec.salt||'',pass);
           if(h!==rec.passHash) throw {code:'wrong-password'};
           currentUser={uid,email:rec.email,username:rec.username,photo:rec.photo||''};
-          saveSession(uid);
+          saveSession(uid); cacheUser(currentUser);
           toast('تم تسجيل الدخول ✓'); route();
         }
       }catch(e){
@@ -1063,7 +1073,7 @@ const auth = getAuth(app);
         const rec=(await loadUserRecord(currentUser.uid))||{};
         const merged={...rec, username:name.slice(0,40), email:rec.email||currentUser.email||'', createdAt:rec.createdAt||Date.now(), photo};
         await set(ref(db,'users/'+currentUser.uid), merged);
-        currentUser.username=merged.username; currentUser.photo=photo;
+        currentUser.username=merged.username; currentUser.photo=photo; cacheUser(currentUser);
         noteEl.className='acct-note ok'; noteEl.textContent='✓ تم حفظ التغييرات'; toast('تم حفظ الملف الشخصي ✓');
       }catch(e){ console.error(e); noteEl.className='acct-note'; noteEl.textContent='تعذّر الحفظ — تأكد من نشر قواعد قاعدة البيانات'; }
       finally{ btn.disabled=false; btn.textContent=old; }
@@ -1079,7 +1089,7 @@ const auth = getAuth(app);
         <div><h2>بروفايلاتي</h2><div class="sub">جميع البروفايلات المرتبطة بحسابك.</div></div>
         <button class="btn primary" id="mkNew" style="width:auto;padding:12px 22px">+ بروفايل جديد</button>
       </div>
-      <div id="mpList"><div class="loader" style="min-height:200px"><div><div class="spin"></div>جارٍ التحميل…</div></div></div>
+      <div id="mpList">${skelGrid(6)}</div>
     </div>` + drawer('mine');
     wireAppbar();
     $('#mkNew').onclick=newProfile;
@@ -1614,10 +1624,10 @@ const auth = getAuth(app);
   }
 
   /* ======================================================================
-     BLOG MODULE — 100 professional design themes, posts, viewer & builder
+     BLOG MODULE — 150 professional design themes, posts, viewer & builder
      ====================================================================== */
-  /* Each design: name + palette. Font scheme (bf) and hero style (bh) are
-     assigned across the set so all 100 feel genuinely distinct & professional. */
+  /* Each design: name + palette. Font scheme (bf) and hero layout (bh) are
+     assigned across the set so all 150 feel genuinely distinct & professional. */
   const _bd=(name,light,bg,panel,text,muted,accent,accent2)=>({name,light,bg,panel,text,muted,accent,accent2});
   const BLOG_DESIGNS_RAW = [
     _bd('ميدنايت','0',  '#0c1424','#111d33','#eef2fb','#9fabc6','#c9a548','#e6c980'),
@@ -1721,6 +1731,57 @@ const auth = getAuth(app);
     _bd('أخضر بحري','0','#031614','#0a2422','#dcf6f2','#8fc4be','#12a094','#4fd4c6'),
     _bd('نبيذي فاخر','0','#160810','#221020','#fbe8f2','#cba4b8','#9a1a58','#dc4c92'),
     _bd('أزرق مخملي','0','#070a1a','#0e142e','#e6eafb','#98a2c4','#3448b8','#7480e4'),
+    /* ---- 50 more professional themes (101–150) ---- */
+    _bd('ليل توتي','0',  '#0c0714','#160e22','#f0e8fb','#b2a4c8','#7a3ad0','#ac78ec'),
+    _bd('قهوة فاتحة','1','#f8f3ec','#ece0d0','#3a2c1e','#7a6a54','#956039','#c2905e'),
+    _bd('أزرق جليدي','1','#f0f8fd','#dcedf8','#123044','#4e6e82','#2287c0','#5cbef0'),
+    _bd('غروب ناري','0','#170a08','#25120e','#ffece4','#d3a898','#e04e2a','#ff8c56'),
+    _bd('زمرد داكن','0','#03130d','#0a2018','#dcfbee','#8cc4aa','#12a05e','#4fd694'),
+    _bd('ضباب رمادي','1','#f5f6f8','#e7eaef','#242832','#5e6472','#556184','#8896b8'),
+    _bd('توهج ذهبي','0','#14110a','#201a10','#fcf3e0','#c2b088','#c99320','#ecc258'),
+    _bd('بترولي','0',   '#04141a','#0a2028','#dcf4fa','#8cbcca','#0f8ca8','#4cccea'),
+    _bd('خزامى فاتح','1','#f9f5fd','#ece2f6','#341c42','#6f5c82','#8a3ec0','#bc7ce6'),
+    _bd('كرزي','0',     '#170710','#23101c','#ffe6f2','#cfa2ba','#a01050','#e2488c'),
+    _bd('عشبي','1',     '#f3f8ee','#e4eed6','#26301a','#5e6a4c','#6a8a2c','#a2b84c'),
+    _bd('نيلي عميق','0','#080826','#101038','#e6e8ff','#a0a2d2','#3434c2','#7676ea'),
+    _bd('مرجان فاتح','1','#fff5f3','#fbe4de','#48261e','#8a655a','#d0583c','#f49a7c'),
+    _bd('رخام داكن','0','#0c0d0f','#17181c','#eef0f4','#a4a8b0','#c8ccd6','#f0f2f8'),
+    _bd('عنبر غامق','0','#160f05','#241810','#fdf2df','#cbb082','#dc9418','#f8c250'),
+    _bd('محيطي','1',    '#eff9fd','#d8eff8','#0e3040','#4a7080','#1a8cba','#58c2e4'),
+    _bd('برقوق داكن','0','#130818','#1e1028','#f2e6fb','#b8a6cc','#7228bc','#a86ce0'),
+    _bd('ليموني داكن','0','#0d1206','#171e0a','#f2ffde','#bcce92','#7ea81e','#bcec48'),
+    _bd('صدأ','0',      '#160c07','#231610','#fbeee2','#cba892','#b06030','#dc9260'),
+    _bd('سماوي عميق','0','#04101e','#0a2034','#e2f0fb','#94accc','#1a72c8','#58a2ec'),
+    _bd('وردي غامق','0','#170812','#221020','#ffe6f4','#cba2ba','#b01868','#e650a0'),
+    _bd('فيروز فاتح','1','#effcfb','#d6f4f2','#0e3a38','#4a7a76','#12aca6','#50d8d0'),
+    _bd('كحلي فحمي','0','#080a16','#101228','#e6e8f4','#98a0be','#3a4e9a','#7284c8'),
+    _bd('خوخ فاتح','1', '#fff6f0','#fbe6da','#4a2e20','#8a6656','#d06838','#f4a072'),
+    _bd('بنفسج داكن','0','#0e0620','#160c34','#eee4ff','#aa9cd2','#6a24c8','#a068ec'),
+    _bd('زيتي داكن','0','#101305','#1a200a','#eef4de','#b0bc8e','#748a20','#aec84a'),
+    _bd('تركواز غامق','0','#031816','#0a2622','#dcf6f2','#8ec6bc','#12a894','#50d8c4'),
+    _bd('ذهب وردي','1', '#fef4f2','#f7e2dc','#42272a','#886066','#c06a72','#e89ca2'),
+    _bd('أزرق فولاذي2','0','#070c16','#0e162c','#e6ecf6','#98a4bc','#345ea8','#6a90d4'),
+    _bd('نعناع فاتح','1','#eefbf5','#d8f2e6','#0e3a2c','#4a7a66','#12a86e','#50d69e'),
+    _bd('كهرمان فاتح','1','#fdf6ea','#f2e6cc','#3a2e14','#7a6a48','#a07818','#cca044'),
+    _bd('أرجوان غامق','0','#100622','#180e36','#f0e4ff','#ac9ad4','#7020c8','#a662ec'),
+    _bd('بحري فاتح','1','#f0f7fd','#dcecf8','#123244','#4e7082','#2280bc','#5cb8ee'),
+    _bd('برتقال داكن','0','#160b05','#231410','#ffece0','#d0a68e','#dc5e1e','#fc9250'),
+    _bd('أخضر داكن2','0','#06120c','#0c1e16','#def6ea','#8ec2a6','#149660','#4ec894'),
+    _bd('ياقوت فاتح','1','#fdf3f5','#f6e2e8','#3f1a24','#885864','#bc3a5e','#e47c98'),
+    _bd('رمادي أزرق','1','#f4f6fa','#e4e9f2','#1e2a3c','#586880','#4a6494','#7e9cc8'),
+    _bd('كوبالت غامق','0','#040820','#0a1236','#e6eafb','#96a0c8','#2842c4','#6478ea'),
+    _bd('خمري فاتح','1','#fbf2f4','#f4e0e6','#3d1a24','#865864','#b03a56','#dc7a92'),
+    _bd('عنبي','0',     '#0e0716','#180e26','#eee4f6','#b0a2c4','#6234a8','#9c6cd4'),
+    _bd('ذهبي رملي2','1','#faf5ea','#efe4ca','#352a16','#786c4c','#94661e','#c49838'),
+    _bd('محيط داكن2','0','#03121c','#081f30','#dcf0fb','#8eaecc','#1276b8','#4ca8ec'),
+    _bd('نعناعي غامق','0','#04140e','#0a2018','#def8ec','#8ec6a8','#14a468','#50d69a'),
+    _bd('توت فاتح','1', '#fdf2f8','#f6e0ee','#3f1a30','#88586e','#b03a7c','#dc7ab0'),
+    _bd('فحمي أزرق','0','#0a0c12','#151822','#eef0f6','#a2a8b6','#6a8cf0','#a0b8ff'),
+    _bd('عسلي','0',     '#160f06','#241810','#fef2e0','#cbb084','#dc9820','#f8c458'),
+    _bd('سماوي غامق','0','#040e1c','#0a1c30','#e0eefb','#92aacc','#1a68c4','#589cec'),
+    _bd('بنفسج فاتح','1','#f8f4fd','#eae0f6','#301a40','#6c5a80','#8434c0','#b674e6'),
+    _bd('زبرجد','0',    '#03140f','#0a201a','#dcf6ee','#8ec6ba','#12a084','#50d4bc'),
+    _bd('أنيق أبيض2','1','#fdfdfd','#f0f1f3','#1a1a1e','#66666e','#2a2a30','#565660'),
   ];
   const _BF=['serif','amiri','mixed','sans','serif','mono'];
   const _BH=['cover','band','center','split','mag'];
@@ -2112,7 +2173,7 @@ const auth = getAuth(app);
       </div>` + drawer('blogs');
       wireAppbar(); $('#baCreate').onclick=newBlog;
     };
-    $('#app').innerHTML = appbar('blogs') + `<div class="wrap"><div class="loader" style="min-height:220px"><div><div class="spin"></div>جارٍ التحميل…</div></div></div>` + drawer('blogs');
+    $('#app').innerHTML = appbar('blogs') + `<div class="wrap">${skelGrid(4)}</div>` + drawer('blogs');
     wireAppbar();
     try{
       const s=await get(child(ref(db),'userBlogs/'+currentUser.uid));
@@ -2625,7 +2686,7 @@ const auth = getAuth(app);
       </div></section>
       <div class="wrap">
         <div class="xp-count" id="xpCount"></div>
-        <div id="xpList"><div class="loader" style="min-height:220px"><div><div class="spin"></div>جارٍ تحميل المدونات…</div></div></div>
+        <div id="xpList">${skelGrid(6)}</div>
       </div>` + (currentUser?drawer('explore'):'');
     wireAppbar();
     try{
@@ -2688,10 +2749,17 @@ const auth = getAuth(app);
   }
   (async function init(){
     const uid=getSession();
-    if(uid){
-      const rec=await loadUserRecord(uid);
-      if(rec) currentUser={uid, email:rec.email||'', username:rec.username||'مستخدم', photo:rec.photo||''};
-      else clearSession();
+    if(!uid){ route(); return; }
+    const cached=getCachedUser();
+    if(cached && cached.uid===uid){
+      // instant render from cache; refresh the record quietly in the background
+      currentUser=cached; route();
+      loadUserRecord(uid).then(rec=>{ if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||'مستخدم', photo:rec.photo||''}; cacheUser(currentUser); } }).catch(()=>{});
+      return;
     }
+    // no cache (old session): wait for the record but never hang the page > 8s
+    let rec=null;
+    try{ rec=await Promise.race([loadUserRecord(uid), new Promise(r=>setTimeout(()=>r(null),8000))]); }catch(e){}
+    if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||'مستخدم', photo:rec.photo||''}; cacheUser(currentUser); }
     route();
   })();
