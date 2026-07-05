@@ -5,7 +5,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/fireba
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app-check.js";
 import { getDatabase, ref, set, get, child, remove } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
 import { getAuth, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
- 
+
 const firebaseConfig = {
   apiKey: "AIzaSyDynVoQRSD9icEcXfEz8Fdjms-sNd9gz9Y",
   authDomain: "xogame-a4254.firebaseapp.com",
@@ -1246,18 +1246,21 @@ const auth = getAuth(app);
         </details>
 
         <details class="acc">
-          <summary><span class="sum-t">${UICON.palette} لون التصميم <span style="color:var(--muted-2);font-weight:400">(${TEMPLATES.length})</span></span></summary>
+          <summary><span class="sum-t">${UICON.palette} لون التصميم <span style="color:var(--muted-2);font-weight:400">(${TEMPLATES.length})</span> ${isPremium()?'':'<span class="lock-chip">'+LOCKICON+' مميز</span>'}</span></summary>
           <div class="acc-body">
+            ${isPremium()?'':gateNote('أول '+FREE_PROFILE_COLORS+' لوناً مجانية — وباقي الألوان للمشتركين المميزين.')}
             <div class="templates" id="tpls">
-              ${TEMPLATES.map(t=>`<div class="tpl t-${t.id} ${t.id===state.template?'active':''}" data-tpl="${t.id}">
-                <div class="swatch"></div><div class="nm">${t.name}</div></div>`).join('')}
+              ${TEMPLATES.map((t,ti)=>{ const lk=ti>=FREE_PROFILE_COLORS; return `<div class="tpl t-${t.id} ${t.id===state.template?'active':''} ${lk?'locked':''}" data-tpl="${t.id}" ${lk?'data-locked="1"':''}>
+                <div class="swatch">${lk?'<span class="tpl-lock">'+LOCKICON+'</span>':''}</div><div class="nm">${t.name}</div></div>`; }).join('')}
             </div>
           </div>
         </details>
 
         <details class="acc">
-          <summary><span class="sum-t">${UICON.cube} المؤثرات ثلاثية الأبعاد</span></summary>
+          <summary><span class="sum-t">${UICON.cube} المؤثرات ثلاثية الأبعاد ${isPremium()?'':'<span class="lock-chip">'+LOCKICON+' مميز</span>'}</span></summary>
           <div class="acc-body">
+            ${isPremium()?'':gateNote('المؤثرات ثلاثية الأبعاد وحركة الظهور متاحة للمشتركين المميزين.')}
+            <div class="${isPremium()?'':'is-locked'}">
             <div class="opt-row">
               <div><div class="lbl">إمالة تفاعلية (3D)</div><div class="desc">تميل البطاقة مع المؤشر وتبرز النصوص</div></div>
               <label class="switch"><input type="checkbox" id="f-threeD" ${state.threeD?'checked':''}><span class="slider"></span></label>
@@ -1268,13 +1271,15 @@ const auth = getAuth(app);
                 ${MOTIONS.map(m=>`<option value="${m.id}" ${m.id===state.motion3d?'selected':''}>${m.name}</option>`).join('')}
               </select>
             </div>
+            </div>
           </div>
         </details>
 
         <details class="acc">
-          <summary><span class="sum-t">${UICON.wand} حركة الظهور</span></summary>
+          <summary><span class="sum-t">${UICON.wand} حركة الظهور ${isPremium()?'':'<span class="lock-chip">'+LOCKICON+' مميز</span>'}</span></summary>
           <div class="acc-body">
-            <div class="opt-row">
+            ${isPremium()?'':gateNote('حركة ظهور البروفايل متاحة للمشتركين المميزين.')}
+            <div class="opt-row ${isPremium()?'':'is-locked'}">
               <div><div class="lbl">أنيميشن الظهور</div><div class="desc">يظهر به البروفايل عند فتح الرابط</div></div>
               <div style="display:flex;gap:8px;align-items:center">
                 <select id="f-anim" class="mini-select">
@@ -1316,8 +1321,10 @@ const auth = getAuth(app);
         </details>
 
         <details class="acc">
-          <summary><span class="sum-t">${UICON.grid} معرض الصور والفيديو</span></summary>
+          <summary><span class="sum-t">${UICON.grid} معرض الصور والفيديو ${isPremium()?'':'<span class="lock-chip">'+LOCKICON+' مميز</span>'}</span></summary>
           <div class="acc-body">
+            ${isPremium()?'':gateNote('معرض الصور والفيديوهات داخل البروفايل متاح للمشتركين المميزين.')}
+            <div class="${isPremium()?'':'is-locked'}">
             <div class="field">
               <label>معرض صور داخل البروفايل</label>
               <div class="upload-row">
@@ -1337,6 +1344,7 @@ const auth = getAuth(app);
               </div>
               <div class="up-note" id="vidNote">ألصق رابط الفيديو ثم اضغط «إضافة» — يظهر مدمجاً داخل البروفايل.</div>
               <div class="media-list" id="vidList"></div>
+            </div>
             </div>
           </div>
         </details>
@@ -1544,9 +1552,10 @@ const auth = getAuth(app);
     const ls=$('#laySearch'); if(ls) ls.oninput=()=>{ const q=ls.value.trim();
       $('#lays').querySelectorAll('.lay').forEach(el=>{ el.style.display = el.dataset.name.includes(q)?'':'none'; }); };
 
-    // color template picker
+    // color template picker (locked colors need a subscription)
     $('#tpls').querySelectorAll('.tpl').forEach(t=>{
       t.onclick=()=>{
+        if(t.dataset.locked && !isPremium()){ toast('هذا اللون للمشتركين المميزين ✦'); return; }
         state.template=t.dataset.tpl;
         $('#tpls').querySelectorAll('.tpl').forEach(x=>x.classList.toggle('active',x===t));
         paint();
@@ -1566,8 +1575,13 @@ const auth = getAuth(app);
         const ownerName = editing ? editMeta.ownerName : currentUser.username;
         const createdAt = editing ? editMeta.createdAt : Date.now();
         const id = editingId || await uniqueShortId();
-        // free accounts can't save an exclusive (premium) layout
-        if(!isPremium()){ const li=LAYOUTS.findIndex(l=>l.id===state.layout); if(li>=FREE_PROFILE_LAYOUTS) state.layout=(LAYOUTS[0]||{}).id||state.layout; }
+        // free accounts can't save premium profile features
+        if(!isPremium()){
+          const li=LAYOUTS.findIndex(l=>l.id===state.layout); if(li>=FREE_PROFILE_LAYOUTS) state.layout=(LAYOUTS[0]||{}).id||state.layout;
+          const ti=TEMPLATES.findIndex(t=>t.id===state.template); if(ti>=FREE_PROFILE_COLORS) state.template=(TEMPLATES[0]||{}).id||state.template;
+          state.threeD=false; state.anim='none'; if(MOTIONS[0]) state.motion3d=MOTIONS[0].id;
+          state.gallery=[]; state.videos=[];
+        }
         const clean = {...state, ownerUid:owner, ownerName, createdAt, updatedAt:Date.now(), viewSalt:null, viewPassHash:null};
         await set(ref(db,'profiles/'+id), clean);
         await set(ref(db,'userProfiles/'+owner+'/'+id), {name:state.name||'بدون اسم', template:state.template, updatedAt:Date.now()});
@@ -2835,6 +2849,7 @@ const auth = getAuth(app);
   /* ---- premium gating: which features require a subscription ---- */
   const FREE_BLOG_DESIGNS = 50;      // first 50 blog designs are free
   const FREE_PROFILE_LAYOUTS = 50;   // first 50 profile layouts are free
+  const FREE_PROFILE_COLORS = 12;    // first 12 profile colors are free
   const blogDesignLocked = id => { const n=parseInt(String(id).replace(/\D/g,''),10)||0; return n>FREE_BLOG_DESIGNS; };
   const gateNote = (txt)=>`<div class="gate-note">${LOCKICON}<span>${txt}</span><a href="${pageUrl('premium.html')}">ترقية للاشتراك المميز ✦</a></div>`;
   const LOCKICON='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';

@@ -1922,6 +1922,10 @@
   .lay .lay-lock{position:absolute;top:6px;left:6px;display:none;color:var(--gold-2)}
   .user-free .lay.locked .lay-lock{display:block}
   .user-free .lay.locked{opacity:.7}
+  .tpl .tpl-lock{position:absolute;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);color:var(--gold-2)}
+  .tpl .tpl-lock svg{width:14px;height:14px}
+  .user-free .tpl.locked .tpl-lock{display:grid}
+  .user-free .tpl.locked{opacity:.72}
   /* code blocks in articles are premium — hide the buttons for free users */
   .user-free .rte-btn[data-codeblock],.user-free .rte-btn[data-codeinline]{display:none}
 
