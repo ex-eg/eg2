@@ -35,6 +35,13 @@
   .builder .preview-col{min-width:0}
   .builder .preview-col #blogPrev,.builder .preview-col .stage{max-width:100%}
   @media(max-width:920px){.builder{grid-template-columns:1fr}}
+  /* the live blog preview is a narrow panel — render it stacked (single column)
+     so the sidebar/columns don't look cramped or broken inside it */
+  #blogPrev .blog-layout{grid-template-columns:1fr}
+  #blogPrev .blog-side{position:static}
+  #blogPrev .blog-feat{grid-template-columns:1fr}
+  #blogPrev .blog-grid{grid-template-columns:1fr}
+  #blogPrev .blog-feat .bf-media{min-height:180px}
 
   .panel{background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--stroke);
     border-radius:16px;padding:clamp(18px,3vw,26px);position:relative;overflow:hidden}
@@ -1373,11 +1380,34 @@
   .bd-swatch .sw::after{content:"";position:absolute;left:6px;right:6px;bottom:6px;height:6px;border-radius:4px;background:rgba(255,255,255,.85)}
   .bd-swatch .nm{font-size:10.5px;color:var(--muted)}
   .bd-swatch.active .nm{color:var(--gold-2)}
-  .post-item{border:1px solid var(--stroke);border-radius:12px;padding:14px;margin-bottom:12px;background:rgba(255,255,255,.02)}
-  .post-item .pi-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
-  .post-item .pi-num{font-size:12px;color:var(--gold-2);font-weight:600}
-  .post-item .pi-del{background:none;border:1px solid var(--stroke);color:#ff8f9e;border-radius:8px;padding:5px 11px;cursor:pointer;font-family:inherit;font-size:12px}
+  /* collapsible article cards (accordion — one opens at a time) */
+  .post-item{border:1px solid var(--stroke);border-radius:14px;margin-bottom:10px;background:rgba(255,255,255,.02);
+    overflow:hidden;transition:border-color .2s,box-shadow .2s}
+  .post-item.open{border-color:rgba(201,165,72,.5);box-shadow:0 12px 30px -18px rgba(0,0,0,.6);background:rgba(255,255,255,.03)}
+  .post-item .pi-head{display:flex;align-items:center;gap:11px;padding:14px;cursor:pointer;user-select:none;transition:background .15s}
+  .post-item .pi-head:hover{background:rgba(255,255,255,.03)}
+  .post-item .pi-num{flex:none;width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-size:13px;font-weight:700;
+    color:var(--gold-2);background:color-mix(in srgb,var(--gold) 15%,transparent);font-family:"Space Grotesk",sans-serif}
+  .post-item.open .pi-num{background:linear-gradient(135deg,var(--gold),var(--gold-2));color:#1a1300}
+  .post-item .pi-name{flex:1;min-width:0;font-weight:600;font-size:14.5px;color:var(--txt);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .post-item .pi-stat{flex:none;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:100px}
+  .post-item .pi-stat.on{color:#7ee0a8;background:rgba(80,200,120,.14)}
+  .post-item .pi-stat.off{color:#ffb86b;background:rgba(255,170,80,.14)}
+  .post-item .pi-del{flex:none;background:none;border:none;color:#ff8f9e;cursor:pointer;padding:6px;border-radius:9px;line-height:0;transition:background .15s}
+  .post-item .pi-del:hover{background:rgba(255,120,140,.14)}
+  .post-item .pi-del svg{width:18px;height:18px}
+  .post-item .pi-chev{flex:none;color:var(--muted);line-height:0;transition:transform .25s}
+  .post-item.open .pi-chev{transform:rotate(180deg);color:var(--gold-2)}
+  .post-item .pi-body{display:none;padding:2px 14px 15px;border-top:1px solid var(--stroke-soft)}
+  .post-item.open .pi-body{display:block;animation:paneIn .25s ease}
+  .post-item .pi-body .field{margin-bottom:11px}
   .post-item .up-row2{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  @media(max-width:600px){
+    .post-item .pi-head{padding:15px 14px}
+    .post-item .pi-name{font-size:15px}
+    .post-item .pi-num{width:30px;height:30px}
+  }
   .posts-empty{color:var(--muted);font-size:13px;text-align:center;padding:16px;border:1px dashed var(--stroke);border-radius:10px;margin-bottom:12px}
 
   /* ---------- rich text editor (Blogger-style) ---------- */
@@ -1512,10 +1542,13 @@
   body{display:flex;flex-direction:column;min-height:100vh}
   #app,main{flex:1 0 auto}
   .site-foot{flex-shrink:0}
-  /* viewer & blog pages carry their own footer — hide the generic one there */
+  /* viewer & blog pages carry their own footer — hide the generic one there.
+     builder pages have a fixed bottom nav (mobile) — the generic footer collides
+     with it, so hide it there too. */
   body:has(#app > .blog) .site-foot,
   body:has(#app > .viewer) .site-foot,
-  body:has(#app > .err-wrap) .site-foot{display:none}
+  body:has(#app > .err-wrap) .site-foot,
+  body:has(.builder) .site-foot{display:none}
 
   /* scroll reveal (toggled by assets/fx.js) */
   .reveal{opacity:0;transform:translateY(22px);transition:opacity .75s var(--ease),transform .75s var(--ease)}
@@ -1722,7 +1755,8 @@
   .drawer-head .dr-av{width:48px;height:48px;font-size:19px;box-shadow:0 0 0 3px color-mix(in srgb,var(--gold) 22%,transparent)}
   .drawer-nav{padding:12px 12px;gap:4px}
   .dr-item{padding:14px 15px;font-size:15px;border-radius:14px;font-weight:600;position:relative;overflow:hidden;
-    transition:background .18s,color .18s,transform .12s}
+    text-decoration:none;transition:background .18s,color .18s,transform .12s}
+  .dr-item span{text-decoration:none}
   .dr-item svg{width:22px;height:22px;transition:transform .2s,color .2s}
   .dr-item:hover{background:rgba(255,255,255,.05)}
   .dr-item:active{transform:scale(.98)}
@@ -1767,6 +1801,16 @@
   .skel-foot{display:flex;gap:10px;align-items:center;margin-top:6px}
   .skel-av{width:30px;height:30px;border-radius:50%;flex:none}
   .skel-chip{height:26px;width:80px;border-radius:100px}
+
+  /* mobile performance: kill continuous full-screen animations that cause jank
+     on phones (keep the static gradient + one-shot effects) */
+  @media(max-width:600px){
+    body::before{animation:none}
+    .brand .mark::after{animation:none;opacity:.35}
+    .marquee-track{animation:none;transform:none}
+    .install-card .ii{animation:none}
+    .orb{animation:none}
+  }
 
   /* mobile-wide polish (all app pages) */
   @media(max-width:600px){

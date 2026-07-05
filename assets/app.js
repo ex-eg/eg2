@@ -2469,32 +2469,51 @@ const auth = getAuth(app);
       const wrap=$('#postsList'); if(!wrap) return;
       $('#postsCount').textContent='('+blogState.posts.length+')';
       if(!blogState.posts.length){ wrap.innerHTML=`<div class="posts-empty">لا توجد مقالات بعد — اضغط «إضافة مقالة».</div>`; return; }
-      wrap.innerHTML=blogState.posts.map((p,i)=>`
-        <div class="post-item" data-pi="${i}">
-          <div class="pi-head"><span class="pi-num">مقالة ${i+1}</span>
-            <button type="button" class="pi-del" data-pdel="${i}">حذف</button></div>
-          <div class="field" style="margin-bottom:10px"><input data-pf="title" value="${esc(p.title)}" placeholder="عنوان المقالة"/></div>
-          <div class="grid2" style="margin-bottom:10px">
-            <input data-pf="tag" value="${esc(p.tag||'')}" placeholder="التصنيف (مثال: تقنية)"/>
-            <input data-pf="date" value="${esc(typeof p.date==='number'?'':(p.date||''))}" placeholder="التاريخ (اختياري)"/>
+      const trashIco='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>';
+      const chevIco='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+      wrap.innerHTML=blogState.posts.map((p,i)=>{
+        const pub=p.published!==false;
+        return `<div class="post-item" data-pi="${i}">
+          <div class="pi-head" data-ptoggle="${i}">
+            <span class="pi-num">${i+1}</span>
+            <span class="pi-name">${esc(p.title)||'مقالة بدون عنوان'}</span>
+            <span class="pi-stat ${pub?'on':'off'}">${pub?'منشورة':'مسودة'}</span>
+            <button type="button" class="pi-del" data-pdel="${i}" title="حذف المقالة">${trashIco}</button>
+            <span class="pi-chev">${chevIco}</span>
           </div>
-          <div class="field" style="margin-bottom:10px">
-            <div class="up-row2"><input data-pf="cover" value="${esc(p.cover||'')}" placeholder="رابط صورة المقالة (اختياري)" style="flex:1"/>
-            <button type="button" class="btn ghost" data-pup="${i}" style="padding:10px 14px">${IC2.up} رفع</button>
-            <input type="file" accept="image/*" hidden data-pfile="${i}"/></div>
+          <div class="pi-body">
+            <div class="field"><label>عنوان المقالة</label><input data-pf="title" value="${esc(p.title)}" placeholder="عنوان المقالة"/></div>
+            <div class="grid2">
+              <div class="field" style="margin:0"><label>التصنيف</label><input data-pf="tag" value="${esc(p.tag||'')}" placeholder="مثال: تقنية"/></div>
+              <div class="field" style="margin:0"><label>التاريخ (اختياري)</label><input data-pf="date" value="${esc(typeof p.date==='number'?'':(p.date||''))}" placeholder="اختياري"/></div>
+            </div>
+            <div class="field"><label>صورة المقالة (اختياري)</label>
+              <div class="up-row2"><input data-pf="cover" value="${esc(p.cover||'')}" placeholder="رابط الصورة" style="flex:1"/>
+              <button type="button" class="btn ghost" data-pup="${i}" style="padding:10px 14px">${IC2.up} رفع</button>
+              <input type="file" accept="image/*" hidden data-pfile="${i}"/></div>
+            </div>
+            <div class="field"><label>مقتطف قصير (اختياري)</label><textarea data-pf="excerpt" placeholder="يظهر في البطاقة — يُؤخذ من بداية المقال إن تُرك فارغاً" style="min-height:56px">${esc(p.excerpt||'')}</textarea></div>
+            <label class="acc-lbl" style="display:block;margin-bottom:7px;font-size:12.5px;color:var(--muted)">نص المقالة (محرّر احترافي)</label>
+            <div class="rte">${RTE_TOOLBAR}
+              <div class="rte-editor" contenteditable="true" data-editor data-ph="اكتب مقالتك هنا ونسّقها بالأزرار أعلاه — عناوين، قوائم، اقتباس، أكواد، صور…"></div>
+              <input type="file" accept="image/*" hidden data-rtefile/>
+            </div>
           </div>
-          <div class="field" style="margin-bottom:10px"><textarea data-pf="excerpt" placeholder="مقتطف قصير يظهر في البطاقة (اختياري — يُؤخذ من بداية المقال إن تُرك فارغاً)" style="min-height:56px">${esc(p.excerpt||'')}</textarea></div>
-          <label class="acc-lbl" style="display:block;margin-bottom:7px;font-size:12.5px;color:var(--muted)">نص المقالة (محرّر احترافي)</label>
-          <div class="rte">${RTE_TOOLBAR}
-            <div class="rte-editor" contenteditable="true" data-editor data-ph="اكتب مقالتك هنا ونسّقها بالأزرار أعلاه — عناوين، قوائم، اقتباس، روابط، صور… تماماً مثل بلوجر."></div>
-            <input type="file" accept="image/*" hidden data-rtefile/>
-          </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
+      // collapsible cards — only one article opens at a time (accordion)
+      wrap.querySelectorAll('[data-ptoggle]').forEach(h=>h.addEventListener('click',e=>{
+        if(e.target.closest('[data-pdel]')) return;
+        const item=h.closest('.post-item'), wasOpen=item.classList.contains('open');
+        wrap.querySelectorAll('.post-item.open').forEach(x=>x.classList.remove('open'));
+        if(!wasOpen){ item.classList.add('open'); setTimeout(()=>item.scrollIntoView({behavior:'smooth',block:'nearest'}),70); }
+      }));
       // per-field input (title / tag / date / cover / excerpt)
       wrap.querySelectorAll('.post-item').forEach(item=>{
         const i=+item.dataset.pi;
         item.querySelectorAll('[data-pf]').forEach(inp=>{
-          inp.addEventListener('input',()=>{ blogState.posts[i][inp.dataset.pf]=inp.value; repaint(); });
+          inp.addEventListener('input',()=>{ blogState.posts[i][inp.dataset.pf]=inp.value; repaint();
+            if(inp.dataset.pf==='title'){ const nm=item.querySelector('.pi-name'); if(nm) nm.textContent=inp.value||'مقالة بدون عنوان'; } });
         });
         // rich-text editor
         const rte=item.querySelector('[data-editor]');
@@ -2539,20 +2558,28 @@ const auth = getAuth(app);
           };
         }
       });
-      wrap.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=()=>{ blogState.posts.splice(+b.dataset.pdel,1); renderPosts(); repaint(); });
+      wrap.querySelectorAll('[data-pdel]').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); if(!confirm('حذف هذه المقالة؟')) return; blogState.posts.splice(+b.dataset.pdel,1); renderPosts(); repaint(); });
       wrap.querySelectorAll('[data-pup]').forEach(b=>b.onclick=()=>{ const f=wrap.querySelector('[data-pfile="'+b.dataset.pup+'"]'); if(f) f.click(); });
       wrap.querySelectorAll('[data-pfile]').forEach(file=>{
         file.onchange=async()=>{
           const i=+file.dataset.pfile, f=file.files&&file.files[0]; if(!f) return;
           if(!/^image\//.test(f.type)){ toast('الملف ليس صورة'); return; }
           toast('جارٍ رفع الصورة…');
-          try{ const url=await uploadToImgbb(f); blogState.posts[i].cover=url; renderPosts(); repaint(); toast('✓ تم رفع صورة المقالة'); }
+          try{ const url=await uploadToImgbb(f); blogState.posts[i].cover=url;
+            const inp=wrap.querySelector('.post-item[data-pi="'+i+'"] [data-pf="cover"]'); if(inp) inp.value=url;
+            repaint(); toast('✓ تم رفع صورة المقالة'); }
           catch(e){ console.error(e); toast('تعذّر رفع الصورة'); }
         };
       });
     }
     renderPosts();
-    $('#addPost').onclick=()=>{ blogState.posts.push({id:'p'+(blogState.posts.length+1)+'_'+shortId(4),title:'',tag:'',date:'',cover:'',excerpt:'',body:'',published:true}); renderPosts(); repaint(); if(window.__blogSetPane) window.__blogSetPane('articles'); const items=$('#postsList').querySelectorAll('.post-item'); const last=items[items.length-1]; if(last) last.scrollIntoView({behavior:'smooth',block:'center'}); };
+    $('#addPost').onclick=()=>{
+      blogState.posts.push({id:'p'+(blogState.posts.length+1)+'_'+shortId(4),title:'',tag:'',date:'',cover:'',excerpt:'',body:'',published:true});
+      renderPosts(); repaint(); if(window.__blogSetPane) window.__blogSetPane('articles');
+      const items=$('#postsList').querySelectorAll('.post-item'); const last=items[items.length-1];
+      if(last){ wrap_openOnly(last); last.scrollIntoView({behavior:'smooth',block:'center'}); const t=last.querySelector('[data-pf="title"]'); if(t) setTimeout(()=>t.focus(),120); }
+    };
+    function wrap_openOnly(item){ const list=$('#postsList'); if(!list) return; list.querySelectorAll('.post-item.open').forEach(x=>x.classList.remove('open')); item.classList.add('open'); }
 
     repaint();
 
@@ -2645,7 +2672,7 @@ const auth = getAuth(app);
       else if(typeof blogBuilderFocus==='number'){
         setPane('articles');
         const it=$('#postsList .post-item[data-pi="'+blogBuilderFocus+'"]');
-        if(it) it.scrollIntoView({behavior:'smooth',block:'center'});
+        if(it){ it.classList.add('open'); setTimeout(()=>it.scrollIntoView({behavior:'smooth',block:'center'}),120); }
       }else setPane('data');
       blogBuilderFocus=null;
     })();
