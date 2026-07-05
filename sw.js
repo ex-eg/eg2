@@ -1,8 +1,10 @@
-/* elgoharyX — service worker (network-first with offline fallback).
-   Network-first avoids serving stale pages after updates; falls back to cache
-   (and finally the home page) when offline. */
-const CACHE = 'elgoharyx-v1';
-const CORE = ['/', '/index.html', '/assets/styles.css', '/assets/app.js', '/explore.html'];
+/* elgoharyX — service worker (stale-while-revalidate).
+   Serves same-origin GETs from cache INSTANTLY (no waiting on a slow network),
+   then refreshes the cache in the background. This prevents the long "hang" that
+   network-first caused when the network stalled. Firebase / cross-origin traffic
+   is never intercepted, so live data always comes fresh from the database. */
+const CACHE = 'elgoharyx-v2';
+const CORE = ['/', '/index.html', '/assets/styles.css', '/assets/app.js', '/assets/fx.js', '/assets/pwa.js', '/explore.html'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -19,14 +21,18 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  // never intercept Firebase / cross-origin API traffic
   const url = new URL(req.url);
-  if (url.origin !== location.origin) return;
-  e.respondWith(
-    fetch(req).then(res => {
-      const copy = res.clone();
-      caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+  if (url.origin !== location.origin) return;               // let Firebase & CDNs pass through untouched
+  e.respondWith((async () => {
+    const cached = await caches.match(req);
+    const netFetch = fetch(req).then(res => {
+      if (res && res.status === 200) {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+      }
       return res;
-    }).catch(() => caches.match(req).then(m => m || caches.match('/index.html')))
-  );
+    }).catch(() => null);
+    // cached first (instant); otherwise wait for network; final fallback = home page
+    return cached || (await netFetch) || caches.match('/index.html');
+  })());
 });
