@@ -737,6 +737,10 @@ const auth = getAuth(app);
 
   /* ---------- app bar (auth aware) ---------- */
   const modeIcon=()=>document.documentElement.getAttribute('data-mode')==='light'?SUN:MOON;
+  /* avatar: the user's uploaded/Google photo if set, otherwise their initials */
+  const userAvatar=(cls='avatar-sm')=> (currentUser&&currentUser.photo)
+    ? `<span class="${cls} has-img"><img src="${esc(currentUser.photo)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()"/></span>`
+    : `<span class="${cls}">${esc(initials(currentUser?currentUser.username:'؟'))}</span>`;
   function appbar(active){
     const right = currentUser ? `
         <button class="btn ghost ab-only" data-act="mode" title="الوضع" style="padding:9px 12px">${modeIcon()}</button>
@@ -748,7 +752,7 @@ const auth = getAuth(app);
           <a class="btn ghost" href="${urlNewBlog()}" style="padding:9px 15px;font-size:13px">+ مدونة</a>
           <button class="btn ghost" data-act="logout" style="padding:9px 13px;font-size:13px">خروج</button>
         </div>
-        <div class="user-chip"><span class="avatar-sm">${esc(initials(currentUser.username))}</span><span class="uc-name">${esc(currentUser.username)}</span></div>
+        <a class="user-chip" href="${pageUrl('account.html')}" title="الملف الشخصي">${userAvatar('avatar-sm')}<span class="uc-name">${esc(currentUser.username)}</span></a>
         <button class="ab-burger" data-act="menu" aria-label="القائمة">${TAB.burger}</button>`
       : `<button class="btn ghost" data-act="mode" title="الوضع" style="padding:9px 12px">${modeIcon()}</button>
          <a class="btn ghost" href="${urlExplore()}" style="padding:9px 15px;font-size:13px${active==='explore'?';border-color:var(--gold);color:var(--txt)':''}">استكشف المدونات</a>
@@ -770,11 +774,12 @@ const auth = getAuth(app);
           <div class="db-t"><b>Academic Profiles</b><span>منشئ البروفايلات · elgoharyX</span></div>
           <button class="dr-x" data-act="menu-close" aria-label="إغلاق">${TAB.x}</button>
         </div>
-        <div class="drawer-head">
-          <span class="avatar-sm dr-av">${esc(initials(currentUser.username))}</span>
+        <a class="drawer-head" href="${pageUrl('account.html')}" style="text-decoration:none">
+          ${userAvatar('avatar-sm dr-av')}
           <div class="dr-id"><div class="dr-name">${esc(currentUser.username)}</div><div class="dr-sub">${esc(currentUser.email||'حساب elgoharyX')}</div></div>
-        </div>
+        </a>
         <nav class="drawer-nav">
+          <a class="dr-item ${active==='account'?'on':''}" href="${pageUrl('account.html')}">${UICON.person}<span>الملف الشخصي</span></a>
           <a class="dr-item ${active==='explore'?'on':''}" href="${urlExplore()}">${TAB.cards}<span>استكشف المدونات</span></a>
           <a class="dr-item ${active==='mine'?'on':''}" href="${urlMyProfiles()}">${TAB.cards}<span>بروفايلاتي</span></a>
           <a class="dr-item ${active==='blogs'?'on':''}" href="${urlMyBlog()}">${TAB.cards}<span>مدونتي</span></a>
@@ -909,11 +914,11 @@ const auth = getAuth(app);
       let rec = await loadUserRecord(uid);
       if(!rec){
         const uname = String(u.displayName || (email? email.split('@')[0] : 'user')).slice(0,40) || 'user';
-        rec = { username:uname, email, provider:which, createdAt:Date.now() };
+        rec = { username:uname, email, provider:which, photo:u.photoURL||'', createdAt:Date.now() };
         await set(ref(db,'users/'+uid), rec);
         if(email){ try{ await set(ref(db,'emails/'+encEmail(email)), uid); }catch(e){} }
       }
-      currentUser = { uid, email:rec.email||email, username:rec.username||'مستخدم' };
+      currentUser = { uid, email:rec.email||email, username:rec.username||'مستخدم', photo:rec.photo||'' };
       saveSession(uid);
       toast('تم تسجيل الدخول ✓'); route();
     }catch(e){
@@ -978,7 +983,7 @@ const auth = getAuth(app);
           await set(ref(db,'users/'+uid),{username:uname,email,salt,passHash,createdAt:Date.now()});
           await set(ref(db,'usernames/'+uname.toLowerCase()),uid);
           await set(ref(db,'emails/'+encEmail(email)),uid);
-          currentUser={uid,email,username:uname};
+          currentUser={uid,email,username:uname,photo:''};
           saveSession(uid);
           toast('تم إنشاء الحساب ✓'); route();
         }else{
@@ -988,7 +993,7 @@ const auth = getAuth(app);
           if(!rec) throw {code:'user-not-found'};
           const h=await hashPass(rec.salt||'',pass);
           if(h!==rec.passHash) throw {code:'wrong-password'};
-          currentUser={uid,email:rec.email,username:rec.username};
+          currentUser={uid,email:rec.email,username:rec.username,photo:rec.photo||''};
           saveSession(uid);
           toast('تم تسجيل الدخول ✓'); route();
         }
@@ -1007,6 +1012,64 @@ const auth = getAuth(app);
     link:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
     up:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v13"/></svg>',
   };
+
+  /* ---------- account / profile page (edit account + avatar) ---------- */
+  async function showAccount(){
+    if(!currentUser){ gotoLogin(); return; }
+    document.title='الملف الشخصي — elgoharyX';
+    document.body.style.background='';
+    let photo = currentUser.photo || '';
+    const avatarInner=()=> photo
+      ? `<img src="${esc(photo)}" alt="" referrerpolicy="no-referrer"/>`
+      : `<span class="acct-initials">${esc(initials(currentUser.username))}</span>`;
+    const providerLabel = { google:'Google', github:'GitHub' };
+    $('#app').innerHTML = appbar('account') + `<div class="wrap acct-wrap">
+      <div class="panel acct-card">
+        <h2>الملف الشخصي</h2>
+        <div class="sub">عدّل اسمك وصورتك الشخصية — تظهر في كل مكان بحسابك.</div>
+        <div class="acct-top">
+          <span class="acct-avatar" id="acctAvatar">${avatarInner()}</span>
+          <div class="acct-top-btns">
+            <button type="button" class="btn ghost" id="acctUp">${IC2.up} رفع صورة</button>
+            <button type="button" class="btn ghost" id="acctRemove" style="${photo?'':'display:none'}">إزالة الصورة</button>
+            <input type="file" id="acctFile" accept="image/*" hidden/>
+          </div>
+        </div>
+        <div class="acct-note" id="acctNote"></div>
+        <div class="field"><label>اسم المستخدم</label><input id="acct-username" value="${esc(currentUser.username)}" maxlength="40" placeholder="اسمك"/></div>
+        <div class="field"><label>البريد الإلكتروني</label><input value="${esc(currentUser.email||'—')}" disabled/></div>
+        <button class="btn primary" id="acctSave" style="width:100%">حفظ التغييرات</button>
+      </div>
+    </div>` + drawer('account');
+    wireAppbar();
+
+    const noteEl=$('#acctNote');
+    const refresh=()=>{ $('#acctAvatar').innerHTML=avatarInner(); const r=$('#acctRemove'); if(r) r.style.display=photo?'':'none'; };
+    $('#acctUp').onclick=()=>$('#acctFile').click();
+    $('#acctFile').onchange=async()=>{
+      const f=$('#acctFile').files&&$('#acctFile').files[0]; if(!f) return;
+      if(!/^image\//.test(f.type)){ noteEl.className='acct-note'; noteEl.textContent='الملف ليس صورة'; return; }
+      const btn=$('#acctUp'); const old=btn.innerHTML; btn.disabled=true; btn.textContent='جارٍ الرفع…'; noteEl.textContent='';
+      try{ photo=await uploadToImgbb(f); refresh(); noteEl.className='acct-note ok'; noteEl.textContent='✓ تم رفع الصورة — اضغط «حفظ التغييرات» لتثبيتها'; }
+      catch(e){ console.error(e); noteEl.className='acct-note'; noteEl.textContent='تعذّر رفع الصورة، حاول مجدداً'; }
+      finally{ btn.disabled=false; btn.innerHTML=old; $('#acctFile').value=''; }
+    };
+    $('#acctRemove').onclick=()=>{ photo=''; refresh(); noteEl.className='acct-note'; noteEl.textContent='ستُزال الصورة عند الحفظ'; };
+    $('#acctSave').onclick=async()=>{
+      const name=$('#acct-username').value.trim();
+      if(name.length<1){ noteEl.className='acct-note'; noteEl.textContent='اكتب اسم المستخدم'; return; }
+      const btn=$('#acctSave'); btn.disabled=true; const old=btn.textContent; btn.textContent='جارٍ الحفظ…';
+      try{
+        const rec=(await loadUserRecord(currentUser.uid))||{};
+        const merged={...rec, username:name.slice(0,40), email:rec.email||currentUser.email||'', createdAt:rec.createdAt||Date.now(), photo};
+        await set(ref(db,'users/'+currentUser.uid), merged);
+        currentUser.username=merged.username; currentUser.photo=photo;
+        noteEl.className='acct-note ok'; noteEl.textContent='✓ تم حفظ التغييرات'; toast('تم حفظ الملف الشخصي ✓');
+      }catch(e){ console.error(e); noteEl.className='acct-note'; noteEl.textContent='تعذّر الحفظ — تأكد من نشر قواعد قاعدة البيانات'; }
+      finally{ btn.disabled=false; btn.textContent=old; }
+    };
+  }
+
   async function showMyProfiles(){
     if(!currentUser){ showAuth('login'); return; }
     document.title='بروفايلاتي — منشئ البروفايلات';
@@ -2613,6 +2676,7 @@ const auth = getAuth(app);
       case 'login':
         if(currentUser){ location.href=q('next')||urlMyProfiles(); return; }
         showAuth('login'); return;
+      case 'account':     needLogin(showAccount); return;
       case 'my-profiles': needLogin(showMyProfiles); return;
       case 'my-blog':     needLogin(showBlogAdmin); return;
       case 'new-profile': needLogin(()=> q('edit')?startEdit(q('edit')):newProfile()); return;
@@ -2626,7 +2690,7 @@ const auth = getAuth(app);
     const uid=getSession();
     if(uid){
       const rec=await loadUserRecord(uid);
-      if(rec) currentUser={uid, email:rec.email||'', username:rec.username||'مستخدم'};
+      if(rec) currentUser={uid, email:rec.email||'', username:rec.username||'مستخدم', photo:rec.photo||''};
       else clearSession();
     }
     route();
