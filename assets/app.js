@@ -2799,6 +2799,26 @@ const auth = getAuth(app);
      PREMIUM / MANUAL PAYMENTS (InstaPay + Etisalat Cash, admin-approved)
      ====================================================================== */
   const PREMIUM = { first:100, renew:150, months:3, instapay:'01102052415', etisalat:'01102052489' };
+
+  /* ▼▼▼ إشعار البريد للأدمن (EmailJS) — املأ القيم الأربعة من حسابك على emailjs.com ▼▼▼
+     (المفاتيح دي عامة ومصمّمة تُستخدم في المتصفح، فمفيش خطر من ظهورها هنا) */
+  const EMAILJS = {
+    publicKey:  'KN-SelriJR4jhYWoc', // ✓ تم
+    serviceId:  'service_o0p48dy',    // ✓ تم
+    templateId: 'template_vxxti7l',   // ✓ تم
+    toEmail:    'exeg540@gmail.com'    // البريد اللي يستقبل الإشعار
+  };
+  /* ▲▲▲ */
+  const emailjsReady = () => EMAILJS.publicKey && !EMAILJS.publicKey.startsWith('YOUR_');
+  async function notifyAdminEmail(fields){
+    if(!emailjsReady()) return; // لم تُضبط بعد — نتجاهل بهدوء
+    try{
+      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ service_id:EMAILJS.serviceId, template_id:EMAILJS.templateId, user_id:EMAILJS.publicKey, template_params:fields })
+      });
+    }catch(e){ console.warn('email notify failed', e); }
+  }
   const CROWN='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 8.5 6.5 12l3.7-6 1.8 0L15.5 12l4-3.5-1.7 10.5H4.2L2.5 8.5Zm3.2 10.5h12.6"/></svg>';
   const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="26" height="26"><path d="M20 6 9 17l-5-5"/></svg>';
   let adminEmail = undefined; // undefined = not loaded yet, null = none
@@ -2874,7 +2894,11 @@ const auth = getAuth(app);
       const btn=$('#pmSend'); btn.disabled=true; const old=btn.textContent; btn.textContent='جارٍ الإرسال…';
       try{
         const id=shortId(14);
-        await set(ref(db,'paymentRequests/'+id), { uid:currentUser.uid, username:currentUser.username||'', email:currentUser.email||'', method:$('#pmMethod').value, amount:price, screenshot:shot, note:($('#pmNoteInp').value||'').slice(0,500), status:'pending', createdAt:Date.now() });
+        const methodName=$('#pmMethod').value==='etisalat'?'اتصالات كاش':'انستا باي';
+        const noteVal=($('#pmNoteInp').value||'').slice(0,500);
+        await set(ref(db,'paymentRequests/'+id), { uid:currentUser.uid, username:currentUser.username||'', email:currentUser.email||'', method:$('#pmMethod').value, amount:price, screenshot:shot, note:noteVal, status:'pending', createdAt:Date.now() });
+        // notify the admin by email (EmailJS) — fire-and-forget so it never blocks the user
+        notifyAdminEmail({ to_email:EMAILJS.toEmail, username:currentUser.username||'مستخدم', email:currentUser.email||'', method:methodName, amount:String(price), note:noteVal||'—', screenshot:shot, link:pageUrl('admin.html') });
         $('#app').querySelector('.pm-upload').innerHTML=`<div class="pm-done"><div class="ok">${CHECK}</div><h3>تم استلام طلبك ✓</h3><p>سيراجع الأدمن الإيصال ويؤكّد المبلغ، ثم يُفعَّل اشتراكك المميز. عُد لهذه الصفحة لاحقاً للاطمئنان.</p></div>`;
         toast('تم إرسال طلب الاشتراك ✓');
       }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent='تعذّر الإرسال — تأكد من نشر القواعد'; btn.disabled=false; btn.textContent=old; }
