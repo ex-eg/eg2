@@ -1,0 +1,120 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['username','email','createdAt'])",
+        "username":  { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
+        "email":     { ".validate": "newData.isString() && newData.val().length <= 160" },
+        "salt":      { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
+        "passHash":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 256)" },
+        "provider":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 20)" },
+        "photo":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
+        "createdAt": { ".validate": "newData.isNumber()" },
+        "$other":    { ".validate": false }
+      }
+    },
+
+    "usernames": {
+      "$name": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.isString() && newData.val().length <= 64"
+      }
+    },
+
+    "emails": {
+      "$enc": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.isString() && newData.val().length <= 64"
+      }
+    },
+
+    "profiles": {
+      "$id": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['ownerUid','updatedAt'])",
+        "ownerUid":  { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "ownerName": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)" },
+        "name":      { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 200)" },
+        "role":      { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 2000)" },
+        "about":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 6000)" },
+        "photo":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
+        "createdAt": { ".validate": "!newData.exists() || newData.isNumber()" },
+        "updatedAt": { ".validate": "newData.isNumber()" }
+      }
+    },
+
+    "userProfiles": {
+      "$uid": {
+        ".read": true,
+        "$id": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['updatedAt'])",
+          "name":      { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 200)" },
+          "template":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 40)" },
+          "updatedAt": { ".validate": "newData.isNumber()" },
+          "$other":    { ".validate": false }
+        }
+      }
+    },
+
+    "blogs": {
+      "$id": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['ownerUid','updatedAt'])",
+        "ownerUid":  { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "ownerName": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)" },
+        "title":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 300)" },
+        "subtitle":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1200)" },
+        "about":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 6000)" },
+        "design":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 20)" },
+        "createdAt": { ".validate": "!newData.exists() || newData.isNumber()" },
+        "updatedAt": { ".validate": "newData.isNumber()" },
+        "posts": {
+          "$i": {
+            "title": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 400)" },
+            "body":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120000)" }
+          }
+        }
+      }
+    },
+
+    "userBlogs": {
+      "$uid": {
+        ".read": true,
+        "$id": {
+          ".write": true,
+          ".validate": "newData.hasChildren(['updatedAt'])",
+          "title":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 300)" },
+          "design":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 20)" },
+          "updatedAt": { ".validate": "newData.isNumber()" },
+          "$other":    { ".validate": false }
+        }
+      }
+    },
+
+    "blogIndex": {
+      ".read": true,
+      "$id": {
+        ".write": true,
+        ".validate": "newData.hasChildren(['updatedAt'])",
+        "title":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 300)" },
+        "subtitle":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1200)" },
+        "author":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 120)" },
+        "cover":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4000)" },
+        "design":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 20)" },
+        "count":     { ".validate": "!newData.exists() || newData.isNumber()" },
+        "updatedAt": { ".validate": "newData.isNumber()" },
+        "$other":    { ".validate": false }
+      }
+    }
+  }
+}
