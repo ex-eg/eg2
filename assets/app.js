@@ -2843,7 +2843,7 @@ const auth = getAuth(app);
     templateId: 'template_vxxti7l',   // ✓ تم — قالب إشعار الأدمن (طلبات الدفع)
     // (اختياري) قالب مخصّص لإشعارات المستخدمين. لو عندك قالب تاني على EmailJS
     // يستخدم {{to_email}} و{{title}} و{{message}} ضعه هنا؛ وإلا يُستخدم القالب الأساسي.
-    notifyTemplateId: 'YOUR_NOTIFY_TEMPLATE',
+    notifyTemplateId: 'template_v9wqxge', // ✓ قالب إشعارات المستخدمين
     toEmail:    'exeg540@gmail.com'    // البريد اللي يستقبل الإشعار
   };
   /* ▲▲▲ */
