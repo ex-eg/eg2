@@ -5,10 +5,23 @@
 
     "config": {
       ".read": true,
-      ".write": false
+      ".write": false,
+      "adminEmail": {
+        ".write": "auth != null && ( ( !data.exists() && newData.val() === auth.token.email ) || data.val() === auth.token.email )",
+        ".validate": "newData.isString() && newData.val().length <= 160"
+      },
+      "adminGate": {
+        ".write": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
+        ".validate": "newData.hasChildren(['salt','hash'])",
+        "salt": { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "hash": { ".validate": "newData.isString() && newData.val().length <= 128" },
+        "at":   { ".validate": "!newData.exists() || newData.isNumber()" },
+        "$other": { ".validate": false }
+      }
     },
 
     "premium": {
+      ".read": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
       "$uid": {
         ".read": true,
         ".write": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
@@ -41,6 +54,7 @@
     },
 
     "users": {
+      ".read": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
       "$uid": {
         ".read": true,
         ".write": true,
@@ -73,6 +87,7 @@
     },
 
     "profiles": {
+      ".read": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
       "$id": {
         ".read": true,
         ".write": true,
@@ -103,6 +118,7 @@
     },
 
     "blogs": {
+      ".read": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
       "$id": {
         ".read": true,
         ".write": true,
@@ -151,6 +167,35 @@
         "count":     { ".validate": "!newData.exists() || newData.isNumber()" },
         "updatedAt": { ".validate": "newData.isNumber()" },
         "$other":    { ".validate": false }
+      }
+    },
+
+    "announcements": {
+      ".read": true,
+      "$id": {
+        ".write": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
+        ".validate": "newData.hasChildren(['title','createdAt'])",
+        "title":     { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 160" },
+        "body":      { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 2000)" },
+        "uid":       { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+        "by":        { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 160)" },
+        "createdAt": { ".validate": "newData.isNumber()" },
+        "$other":    { ".validate": false }
+      }
+    },
+
+    "notifySubs": {
+      ".read": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
+      "$uid": {
+        ".read": true,
+        ".write": true,
+        ".validate": "newData.hasChildren(['at'])",
+        "username": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 60)" },
+        "email":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 160)" },
+        "enabled":  { ".validate": "!newData.exists() || newData.isBoolean()" },
+        "push":     { ".validate": "!newData.exists() || newData.isBoolean()" },
+        "at":       { ".validate": "newData.isNumber()" },
+        "$other":   { ".validate": false }
       }
     }
   }

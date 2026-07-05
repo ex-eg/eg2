@@ -170,6 +170,35 @@
     .home-faq summary{font-size:14.5px}
     .marquee .sw{width:118px;height:70px}
   }
+
+  /* redesign 2.0 — animated hero centerpiece + stronger identity */
+  @keyframes hm-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  @keyframes hm-spin{to{transform:rotate(360deg)}}
+  @keyframes hm-spin-r{to{transform:rotate(-360deg)}}
+  .hero-mark{width:118px;height:118px;margin:0 auto 24px;position:relative;display:grid;place-items:center}
+  .hero-mark .hm-core{width:74px;height:74px;border-radius:22px;display:grid;place-items:center;position:relative;z-index:3;
+    background:linear-gradient(135deg,var(--accent-2),var(--accent));
+    box-shadow:0 20px 46px -14px rgba(76,134,224,.7),inset 0 1px 0 rgba(255,255,255,.28);animation:hm-float 3.6s var(--ease) infinite}
+  .hero-mark .hm-core img{width:42px;height:42px;border-radius:11px;display:block}
+  .hero-mark .hm-ring{position:absolute;border-radius:50%;border:1.5px dashed color-mix(in srgb,var(--gold-2) 55%,transparent)}
+  .hero-mark .hm-ring.r1{inset:2px;border-style:solid;border-color:color-mix(in srgb,var(--accent-2) 40%,transparent);animation:hm-spin 13s linear infinite}
+  .hero-mark .hm-ring.r2{inset:-12px;animation:hm-spin-r 20s linear infinite}
+  .hero-mark .hm-orbit{position:absolute;inset:-12px;z-index:2;animation:hm-spin 9s linear infinite}
+  .hero-mark .hm-orbit i{position:absolute;top:50%;left:-5px;margin-top:-5px;width:10px;height:10px;border-radius:50%;
+    background:var(--gold-2);box-shadow:0 0 14px 3px rgba(236,208,138,.75)}
+  .hero-mark .hm-orbit.o2{animation-duration:14s;animation-direction:reverse}
+  .hero-mark .hm-orbit.o2 i{background:var(--accent-2);box-shadow:0 0 14px 3px rgba(76,134,224,.7);left:auto;right:-5px}
+  .home-hero h1 .grad-text{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;
+    background-size:200% auto;animation:aurora-pan 8s ease-in-out infinite}
+  .home-hero .kick{background:color-mix(in srgb,var(--gold) 10%,transparent);box-shadow:0 6px 20px -12px rgba(208,170,78,.6)}
+  @media(prefers-reduced-motion:reduce){
+    .hero-mark .hm-core,.hero-mark .hm-ring,.hero-mark .hm-orbit,.home-hero h1 .grad-text{animation:none!important}
+  }
+  @media(max-width:600px){
+    .hero-mark{width:100px;height:100px;margin-bottom:18px}
+    .hero-mark .hm-core{width:62px;height:62px;border-radius:19px}
+    .hero-mark .hm-core img{width:34px;height:34px}
+  }
 </style>
 </head>
 <body>
@@ -213,6 +242,13 @@
     <section class="hero-wrap">
       <span class="orb o1 floaty"></span><span class="orb o2 floaty f2"></span><span class="orb o3 floaty f3"></span>
       <div class="home-hero">
+        <div class="hero-mark reveal r-zoom" aria-hidden="true">
+          <span class="hm-ring r2"></span>
+          <span class="hm-ring r1"></span>
+          <span class="hm-orbit"><i></i></span>
+          <span class="hm-orbit o2"><i></i></span>
+          <span class="hm-core"><img src="https://i.ibb.co/1t1TCvH7/103777.png" alt="elgoharyX"/></span>
+        </div>
         <span class="kick"><span class="pulse-dot"></span> منصّة elgoharyX العربية</span>
         <h1>أنشئ <span class="grad-text">بروفايلك الأكاديمي</span><br>و<span class="grad-text">مدونتك الإلكترونية</span> وشاركهما برابط</h1>
         <p class="lead">منصّة عربية مجانية تصنع لك بطاقة تعريف أكاديمية احترافية ومدونة إلكترونية أنيقة في دقائق — بأكثر من 100 تخطيط للبروفايل و50 تصميماً للمدونة، ومحرّر مقالات يدعم الأكواد البرمجية، وتصميمين منفصلين للهاتف والكمبيوتر.</p>
