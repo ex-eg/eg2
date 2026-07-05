@@ -30,7 +30,10 @@
   .wrap{max-width:1240px;margin:0 auto;padding:clamp(20px,4vw,40px)}
 
   /* ---------- builder layout ---------- */
-  .builder{display:grid;grid-template-columns:minmax(0,420px) 1fr;gap:28px;align-items:start}
+  .builder{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:28px;align-items:start}
+  .builder>.panel{min-width:0}
+  .builder .preview-col{min-width:0}
+  .builder .preview-col #blogPrev,.builder .preview-col .stage{max-width:100%}
   @media(max-width:920px){.builder{grid-template-columns:1fr}}
 
   .panel{background:linear-gradient(180deg,var(--panel),var(--bg-2));border:1px solid var(--stroke);
