@@ -1022,6 +1022,10 @@ const auth = getAuth(app);
           saveSession(uid); cacheUser(currentUser);
           toast('تم إنشاء الحساب ✓'); route();
         }else{
+          // the admin must be a Firebase Auth account → always sign the admin email
+          // in through Firebase (even if a plain site account exists with that email)
+          if(adminEmail===undefined) await loadAdminEmail();
+          if(adminEmail && email.trim().toLowerCase()===adminEmail){ await firebaseEmailLogin(email, pass); return; }
           const uid=await emailToUid(email);
           if(!uid){
             // no custom account with this email — try a Firebase Auth account
@@ -2884,9 +2888,33 @@ const auth = getAuth(app);
     $('#app').innerHTML = appbar('admin') + `<div class="wrap">${skelGrid(3)}</div>` + drawer('admin');
     wireAppbar();
     if(adminEmail===undefined) await loadAdminEmail();
+    const fbAuthed = !!(auth && auth.currentUser);
+    // simple "set admin email" card — saves straight to config/adminEmail
+    const setupCard = () => `<div class="panel" style="max-width:560px;margin:0 auto 18px;padding:20px">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">إعداد بريد الأدمن</h3>
+        <div class="sub" style="margin-bottom:14px">اكتب بريد الأدمن واضغط حفظ — يُخزَّن في قاعدة البيانات تلقائياً.</div>
+        ${adminEmail?`<div class="pm-note ok" style="margin-bottom:12px">الأدمن الحالي: <b dir="ltr">${esc(adminEmail)}</b></div>`:`<div class="pm-note" style="margin-bottom:12px">لم يُضبط الأدمن بعد — احفظ بريدك لتصبح الأدمن.</div>`}
+        ${fbAuthed?`
+          <div class="field"><label>بريد الأدمن</label><input id="admEmailInp" dir="ltr" value="${esc((currentUser.email||'').trim().toLowerCase())}"/></div>
+          <button class="btn primary" id="admSave" style="width:100%">حفظ بريد الأدمن</button>
+          <div class="pm-note" id="admMsg"></div>
+        `:`<div class="gate-note" style="display:block">لتعيين الأدمن يجب تسجيل الدخول عبر <b>Google</b> (حساب Firebase). اخرج ثم ادخل بزر «المتابعة بحساب Google» بنفس بريد الأدمن، ثم ارجع هنا واحفظه.</div>`}
+      </div>`;
+    const wireSetup = () => {
+      const b=$('#admSave'); if(!b) return;
+      b.onclick=async()=>{
+        const em=($('#admEmailInp').value||'').trim().toLowerCase(), msg=$('#admMsg');
+        if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ msg.className='pm-note'; msg.textContent='بريد غير صحيح'; return; }
+        b.disabled=true; const old=b.textContent; b.textContent='جارٍ الحفظ…';
+        try{ await set(ref(db,'config/adminEmail'), em); adminEmail=em; toast('تم حفظ بريد الأدمن ✓'); showAdmin(); }
+        catch(e){ console.error(e); msg.className='pm-note'; msg.textContent='تعذّر الحفظ — لازم تكون داخل بجوجل، وتحفظ بريدك أنت (أول مرة) أو تكون الأدمن الحالي.'; b.disabled=false; b.textContent=old; }
+      };
+    };
     if(!isAdmin()){
-      $('#app').innerHTML = appbar('admin') + `<div class="wrap"><div class="mp-empty">هذه الصفحة للأدمن فقط.<br><br>سجّل الدخول بحساب الأدمن عبر <b>Google / GitHub</b> بنفس الإيميل المُسجَّل في Firebase.</div></div>` + drawer('admin');
-      wireAppbar(); return;
+      $('#app').innerHTML = appbar('admin') + `<div class="wrap">${setupCard()}
+        <div class="mp-empty" style="max-width:560px;margin:0 auto">هذه اللوحة للأدمن فقط. بعد حفظ بريدك بالأعلى (وأنت داخل بجوجل) ستصبح الأدمن مباشرة.</div>
+      </div>` + drawer('admin');
+      wireAppbar(); wireSetup(); return;
     }
     const render=async()=>{
       let list=[];
