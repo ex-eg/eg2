@@ -790,6 +790,8 @@ const auth = getAuth(app);
         </a>
         <nav class="drawer-nav">
           <a class="dr-item ${active==='account'?'on':''}" href="${pageUrl('account.html')}">${UICON.person}<span>الملف الشخصي</span></a>
+          <a class="dr-item dr-vip ${active==='premium'?'on':''}" href="${pageUrl('premium.html')}">${CROWN}<span>الاشتراك المميز</span></a>
+          ${isAdmin()?`<a class="dr-item ${active==='admin'?'on':''}" href="${pageUrl('admin.html')}">${TAB.privacy}<span>لوحة الأدمن</span></a>`:''}
           <a class="dr-item ${active==='explore'?'on':''}" href="${urlExplore()}">${TAB.cards}<span>استكشف المدونات</span></a>
           <a class="dr-item ${active==='mine'?'on':''}" href="${urlMyProfiles()}">${TAB.cards}<span>بروفايلاتي</span></a>
           <a class="dr-item ${active==='blogs'?'on':''}" href="${urlMyBlog()}">${TAB.cards}<span>مدونتي</span></a>
@@ -1048,10 +1050,17 @@ const auth = getAuth(app);
         <div class="acct-note" id="acctNote"></div>
         <div class="field"><label>اسم المستخدم</label><input id="acct-username" value="${esc(currentUser.username)}" maxlength="40" placeholder="اسمك"/></div>
         <div class="field"><label>البريد الإلكتروني</label><input value="${esc(currentUser.email||'—')}" disabled/></div>
+        <div id="acctPremium"></div>
         <button class="btn primary" id="acctSave" style="width:100%">حفظ التغييرات</button>
       </div>
     </div>` + drawer('account');
     wireAppbar();
+    // premium status row (loaded async)
+    getPremium(currentUser.uid).then(pp=>{
+      const box=$('#acctPremium'); if(!box) return;
+      if(premiumActive(pp)) box.innerHTML=`<div class="acct-prem on"><span class="pm-vip">${CROWN} عضو مميز</span><span>فعّال حتى ${fmtDay(pp.expires)}</span></div>`;
+      else box.innerHTML=`<a class="acct-prem off" href="${pageUrl('premium.html')}">${CROWN} ترقية إلى العضوية المميزة</a>`;
+    }).catch(()=>{});
 
     const noteEl=$('#acctNote');
     const refresh=()=>{ $('#acctAvatar').innerHTML=avatarInner(); const r=$('#acctRemove'); if(r) r.style.display=photo?'':'none'; };
@@ -2083,6 +2092,7 @@ const auth = getAuth(app);
       <div class="blog-wrap">${layout}</div>
       ${foot}</div>`;
     wireBlogIndex(id,d);
+    if(d.ownerUid) getPremium(d.ownerUid).then(pp=>{ if(premiumActive(pp)){ const b=$('#app .blog'); if(b) b.classList.add('owner-premium'); } });
     window.scrollTo(0,0);
   }
   function renderArticle(id,d,idx){
@@ -2737,6 +2747,141 @@ const auth = getAuth(app);
     }
   }
 
+  /* ======================================================================
+     PREMIUM / MANUAL PAYMENTS (InstaPay + Etisalat Cash, admin-approved)
+     ====================================================================== */
+  const PREMIUM = { first:100, renew:150, months:3, instapay:'01102052415', etisalat:'01102052489' };
+  const CROWN='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 8.5 6.5 12l3.7-6 1.8 0L15.5 12l4-3.5-1.7 10.5H4.2L2.5 8.5Zm3.2 10.5h12.6"/></svg>';
+  const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="26" height="26"><path d="M20 6 9 17l-5-5"/></svg>';
+  let adminEmail = undefined; // undefined = not loaded yet, null = none
+  async function loadAdminEmail(){
+    try{ const s=await get(child(ref(db),'config/adminEmail')); adminEmail = s.exists()? String(s.val()).trim().toLowerCase() : null; }
+    catch(e){ adminEmail = null; }
+    return adminEmail;
+  }
+  const isAdmin = () => !!(currentUser && adminEmail && (currentUser.email||'').trim().toLowerCase()===adminEmail);
+  async function getPremium(uid){ try{ const s=await get(child(ref(db),'premium/'+uid)); return s.exists()?s.val():null; }catch(e){ return null; } }
+  const premiumActive = p => !!(p && p.active && (!p.expires || p.expires>Date.now()));
+  const fmtDay = ts => { try{ return new Date(ts).toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}); }catch{ return ''; } };
+
+  async function showPremium(){
+    if(!currentUser){ gotoLogin(); return; }
+    document.title='الاشتراك المميز — elgoharyX';
+    document.body.style.background='';
+    $('#app').innerHTML = appbar('premium') + `<div class="wrap"><div class="pro-loader"><div class="pl-in"><div class="pl-ringwrap"><div class="ring"></div></div></div></div></div>` + drawer('premium');
+    wireAppbar();
+    const p = await getPremium(currentUser.uid);
+    const active = premiumActive(p);
+    const price = (p && p.count) ? PREMIUM.renew : PREMIUM.first;
+    let shot='';
+    const statusHtml = active
+      ? `<div class="pm-status ok"><span class="pm-vip">${CROWN} عضو مميز</span><span>اشتراكك فعّال حتى <b>${fmtDay(p.expires)}</b>. يمكنك التجديد بالأسفل.</span></div>`
+      : (p ? `<div class="pm-status off">انتهى اشتراكك السابق — جدّده بالأسفل.</div>` : '');
+    $('#app').innerHTML = appbar('premium') + `<div class="wrap pm-wrap">
+      <div class="pm-hero"><span class="pm-crown">${CROWN}</span>
+        <h1>الاشتراك المميز</h1>
+        <p>ادعم elgoharyX واحصل على شارة «عضو مميز»، وإزالة علامة elgoharyX من روابطك، ومزايا حصرية قادمة.</p></div>
+      ${statusHtml}
+      <div class="pm-price"><b>${price}</b><span>جنيه · لمدة 3 شهور</span>
+        <div class="pm-note2">${price===PREMIUM.renew?'سعر التجديد':'سعر أول اشتراك'} — التجديد بعدها ${PREMIUM.renew} ج</div></div>
+      <div class="pm-card">
+        <h3>1) ادفع عبر إحدى الطريقتين</h3>
+        <div class="pm-method"><div class="pm-mname"><b>InstaPay</b><span>انستا باي</span></div><span class="pm-num">${PREMIUM.instapay}</span><button class="btn ghost" data-copy="${PREMIUM.instapay}">نسخ</button></div>
+        <div class="pm-method"><div class="pm-mname"><b>Etisalat Cash</b><span>اتصالات كاش</span></div><span class="pm-num">${PREMIUM.etisalat}</span><button class="btn ghost" data-copy="${PREMIUM.etisalat}">نسخ</button></div>
+      </div>
+      <div class="pm-card pm-upload">
+        <h3>2) ارفع صورة إثبات الدفع</h3>
+        <div class="field"><label>طريقة الدفع</label><select id="pmMethod" class="mini-select" style="width:100%"><option value="instapay">InstaPay — انستا باي</option><option value="etisalat">Etisalat Cash — اتصالات كاش</option></select></div>
+        <div class="field"><label>صورة الإيصال</label>
+          <button type="button" class="btn ghost" id="pmUp" style="width:100%">${IC2.up} رفع صورة الإيصال</button>
+          <input type="file" id="pmFile" accept="image/*" hidden/>
+          <div class="pm-shot" id="pmShot"></div></div>
+        <div class="field"><label>ملاحظة (اختياري)</label><input id="pmNoteInp" placeholder="اسم المُرسِل أو رقم العملية…"/></div>
+        <div class="pm-note" id="pmMsg"></div>
+        <button class="btn primary" id="pmSend" style="width:100%">إرسال الطلب للمراجعة</button>
+        <div class="pm-hint">بعد مراجعة الأدمن والتأكد من المبلغ (${price} ج) يُفعَّل اشتراكك خلال وقت قصير.</div>
+      </div>
+    </div>` + drawer('premium');
+    wireAppbar();
+    document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ navigator.clipboard?.writeText(b.dataset.copy); toast('تم نسخ الرقم ✓'); });
+    const msg=$('#pmMsg');
+    $('#pmUp').onclick=()=>$('#pmFile').click();
+    $('#pmFile').onchange=async()=>{
+      const f=$('#pmFile').files&&$('#pmFile').files[0]; if(!f) return;
+      if(!/^image\//.test(f.type)){ msg.className='pm-note'; msg.textContent='الملف ليس صورة'; return; }
+      const b=$('#pmUp'); const old=b.innerHTML; b.disabled=true; b.textContent='جارٍ الرفع…';
+      try{ shot=await uploadToImgbb(f); $('#pmShot').innerHTML=`<img src="${esc(shot)}" alt="إيصال"/>`; msg.className='pm-note ok'; msg.textContent='✓ تم رفع الصورة'; }
+      catch(e){ console.error(e); msg.className='pm-note'; msg.textContent='تعذّر رفع الصورة'; }
+      finally{ b.disabled=false; b.innerHTML=old; $('#pmFile').value=''; }
+    };
+    $('#pmSend').onclick=async()=>{
+      if(!shot){ msg.className='pm-note'; msg.textContent='ارفع صورة إثبات الدفع أولاً'; return; }
+      const btn=$('#pmSend'); btn.disabled=true; const old=btn.textContent; btn.textContent='جارٍ الإرسال…';
+      try{
+        const id=shortId(14);
+        await set(ref(db,'paymentRequests/'+id), { uid:currentUser.uid, username:currentUser.username||'', email:currentUser.email||'', method:$('#pmMethod').value, amount:price, screenshot:shot, note:($('#pmNoteInp').value||'').slice(0,500), status:'pending', createdAt:Date.now() });
+        $('#app').querySelector('.pm-upload').innerHTML=`<div class="pm-done"><div class="ok">${CHECK}</div><h3>تم استلام طلبك ✓</h3><p>سيراجع الأدمن الإيصال ويؤكّد المبلغ، ثم يُفعَّل اشتراكك المميز. عُد لهذه الصفحة لاحقاً للاطمئنان.</p></div>`;
+        toast('تم إرسال طلب الاشتراك ✓');
+      }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent='تعذّر الإرسال — تأكد من نشر القواعد'; btn.disabled=false; btn.textContent=old; }
+    };
+  }
+
+  async function showAdmin(){
+    if(!currentUser){ gotoLogin(); return; }
+    document.title='لوحة الأدمن — elgoharyX';
+    document.body.style.background='';
+    $('#app').innerHTML = appbar('admin') + `<div class="wrap">${skelGrid(3)}</div>` + drawer('admin');
+    wireAppbar();
+    if(adminEmail===undefined) await loadAdminEmail();
+    if(!isAdmin()){
+      $('#app').innerHTML = appbar('admin') + `<div class="wrap"><div class="mp-empty">هذه الصفحة للأدمن فقط.<br><br>سجّل الدخول بحساب الأدمن عبر <b>Google / GitHub</b> بنفس الإيميل المُسجَّل في Firebase.</div></div>` + drawer('admin');
+      wireAppbar(); return;
+    }
+    const render=async()=>{
+      let list=[];
+      try{ const s=await get(child(ref(db),'paymentRequests')); list = s.exists()? Object.entries(s.val()).map(([id,v])=>({id,...v})) : []; }
+      catch(e){ console.error(e); $('#app').innerHTML=appbar('admin')+`<div class="wrap"><div class="mp-empty">تعذّر تحميل الطلبات.<br>تأكد أنك داخل بحساب الأدمن (Google/GitHub) وأن القواعد منشورة.</div></div>`+drawer('admin'); wireAppbar(); return; }
+      list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      const pending=list.filter(r=>r.status==='pending').length;
+      const rows = list.length ? list.map(r=>`
+        <div class="adm-req ${esc(r.status||'pending')}">
+          <a class="adm-shot" href="${esc(r.screenshot||'#')}" target="_blank">${r.screenshot?`<img src="${esc(r.screenshot)}" alt="إيصال" loading="lazy"/>`:'<span>لا صورة</span>'}</a>
+          <div class="adm-info">
+            <div class="adm-top"><b>${esc(r.username||'مستخدم')}</b><span class="adm-amt">${Number(r.amount)||0} ج</span><span class="adm-badge ${esc(r.status||'pending')}">${r.status==='approved'?'مفعّل':r.status==='rejected'?'مرفوض':'قيد المراجعة'}</span></div>
+            <div class="adm-meta">${esc(r.email||'')} · ${r.method==='etisalat'?'اتصالات كاش':'انستا باي'} · ${fmtDay(r.createdAt)}</div>
+            ${r.note?`<div class="adm-note">📝 ${esc(r.note)}</div>`:''}
+            <div class="adm-uid">UID: <code>${esc(r.uid)}</code></div>
+            ${r.status==='pending'?`<div class="adm-acts"><button class="btn primary" data-approve="${esc(r.id)}" data-uid="${esc(r.uid)}">${CHECK} تأكيد وتفعيل</button><button class="btn ghost" data-reject="${esc(r.id)}">رفض</button></div>`:''}
+          </div>
+        </div>`).join('') : `<div class="mp-empty">لا توجد طلبات دفع بعد.</div>`;
+      $('#app').innerHTML = appbar('admin') + `<div class="wrap">
+        <div class="mp-head"><div><h2>لوحة الأدمن</h2><div class="sub">طلبات الاشتراك — راجِع الإيصال وأكّد المبلغ ثم فعّل.</div></div>
+          <span class="pm-vip">${pending} قيد المراجعة</span></div>
+        <div class="adm-list">${rows}</div></div>` + drawer('admin');
+      wireAppbar();
+      document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{
+        const id=b.dataset.approve, uid=b.dataset.uid;
+        if(!confirm('تأكيد استلام المبلغ وتفعيل الاشتراك المميز لهذا المستخدم؟')) return;
+        b.disabled=true;
+        try{
+          const cur=await getPremium(uid);
+          const base=(cur && premiumActive(cur) && cur.expires)?cur.expires:Date.now();
+          const expires=base + PREMIUM.months*30*24*3600*1000;
+          const count=((cur && cur.count)?cur.count:0)+1;
+          await set(ref(db,'premium/'+uid), { active:true, plan:String(count>1?PREMIUM.renew:PREMIUM.first), since:(cur&&cur.since)||Date.now(), expires, count });
+          await set(ref(db,'paymentRequests/'+id+'/status'),'approved');
+          toast('تم تفعيل الاشتراك ✓'); render();
+        }catch(e){ console.error(e); toast('تعذّر التفعيل — تأكد أنك داخل بحساب الأدمن'); b.disabled=false; }
+      });
+      document.querySelectorAll('[data-reject]').forEach(b=>b.onclick=async()=>{
+        if(!confirm('رفض هذا الطلب؟')) return;
+        try{ await set(ref(db,'paymentRequests/'+b.dataset.reject+'/status'),'rejected'); toast('تم الرفض'); render(); }
+        catch(e){ console.error(e); toast('تعذّر'); }
+      });
+    };
+    render();
+  }
+
   /* ---------- router (multi-page) ----------
      Each section is its own HTML file that tags <body data-page="…">. The router
      renders that section's view, while legacy ?id=/?blog= links keep working on
@@ -2765,6 +2910,8 @@ const auth = getAuth(app);
         if(currentUser){ location.href=q('next')||urlMyProfiles(); return; }
         showAuth('login'); return;
       case 'account':     needLogin(showAccount); return;
+      case 'premium':     needLogin(showPremium); return;
+      case 'admin':       needLogin(showAdmin); return;
       case 'my-profiles': needLogin(showMyProfiles); return;
       case 'my-blog':     needLogin(showBlogAdmin); return;
       case 'new-profile': needLogin(()=> q('edit')?startEdit(q('edit')):newProfile()); return;
@@ -2777,10 +2924,12 @@ const auth = getAuth(app);
   (async function init(){
     const uid=getSession();
     if(!uid){ route(); return; }
+    loadAdminEmail();                                  // background: enables the admin nav for the admin
+    const applyPrem=()=>getPremium(uid).then(pp=>{ if(currentUser) currentUser.premium=premiumActive(pp); }).catch(()=>{});
     const cached=getCachedUser();
     if(cached && cached.uid===uid){
       // instant render from cache; refresh the record quietly in the background
-      currentUser=cached; route();
+      currentUser=cached; route(); applyPrem();
       loadUserRecord(uid).then(rec=>{ if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||'مستخدم', photo:rec.photo||''}; cacheUser(currentUser); } }).catch(()=>{});
       return;
     }
@@ -2788,5 +2937,5 @@ const auth = getAuth(app);
     let rec=null;
     try{ rec=await Promise.race([loadUserRecord(uid), new Promise(r=>setTimeout(()=>r(null),8000))]); }catch(e){}
     if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||'مستخدم', photo:rec.photo||''}; cacheUser(currentUser); }
-    route();
+    route(); applyPrem();
   })();
