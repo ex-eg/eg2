@@ -764,6 +764,7 @@ const auth = getAuth(app);
           ${isAdmin()?`<a class="btn ghost" href="${pageUrl('admin.html')}" style="padding:9px 13px;font-size:13px${active==='admin'?';border-color:var(--gold);color:var(--txt)':''}">الأدمن</a>`:''}
           <button class="btn ghost" data-act="logout" style="padding:9px 13px;font-size:13px">خروج</button>
         </div>
+        <button class="btn ghost ab-bell" data-act="bell" title="الإشعارات" style="padding:9px 12px;position:relative">${BELL}<span class="bell-dot" id="bellDot" hidden></span></button>
         <a class="user-chip" href="${pageUrl('account.html')}" title="الملف الشخصي">${userAvatar('avatar-sm')}<span class="uc-name">${esc(currentUser.username)}</span></a>
         <button class="ab-burger" data-act="menu" aria-label="القائمة">${TAB.burger}</button>`
       : `<button class="btn ghost" data-act="mode" title="الوضع" style="padding:9px 12px">${modeIcon()}</button>
@@ -896,6 +897,9 @@ const auth = getAuth(app);
     const dw=$('#drawerWrap');
     document.querySelectorAll('[data-act="menu"]').forEach(b=>b.onclick=()=>{ if(dw) dw.classList.add('open'); });
     document.querySelectorAll('[data-act="menu-close"]').forEach(b=>b.onclick=()=>{ if(dw) dw.classList.remove('open'); });
+    // notifications bell (announcements + subscribe)
+    document.querySelectorAll('[data-act="bell"]').forEach(b=>b.onclick=openNotifications);
+    if(currentUser) refreshBell();
   }
 
   /* ---------- auth screen ---------- */
@@ -1085,6 +1089,7 @@ const auth = getAuth(app);
         <div class="field"><label>اسم المستخدم</label><input id="acct-username" value="${esc(currentUser.username)}" maxlength="40" placeholder="اسمك"/></div>
         <div class="field"><label>البريد الإلكتروني</label><input value="${esc(currentUser.email||'—')}" disabled/></div>
         <div id="acctPremium"></div>
+        <div id="acctNotify"></div>
         <button class="btn primary" id="acctSave" style="width:100%">حفظ التغييرات</button>
       </div>
     </div>` + drawer('account');
@@ -1095,6 +1100,22 @@ const auth = getAuth(app);
       if(premiumActive(pp)) box.innerHTML=`<div class="acct-prem on"><span class="pm-vip">${CROWN} عضو مميز</span><span>فعّال حتى ${fmtDay(pp.expires)}</span></div>`;
       else box.innerHTML=`<a class="acct-prem off" href="${pageUrl('premium.html')}">${CROWN} ترقية إلى العضوية المميزة</a>`;
     }).catch(()=>{});
+
+    // notifications subscribe toggle
+    (function(){
+      const box=$('#acctNotify'); if(!box) return;
+      const draw=()=>{ const on=isSubscribed();
+        box.innerHTML=`<div class="acct-notify-row">
+          <span class="an-lbl">${BELL} إشعارات الموقع</span>
+          <button class="btn ${on?'ghost':'primary'}" id="acctNotifBtn" style="width:auto;padding:9px 18px">${on?'إلغاء الاشتراك':'اشترك الآن'}</button></div>`;
+        $('#acctNotifBtn').onclick=async()=>{
+          if(isSubscribed()){ await unsubscribeNotifications(); toast('تم إلغاء الاشتراك'); }
+          else { const p=await subscribeNotifications(); toast(p==='granted'?'تم تفعيل الإشعارات ✓':'تم الاشتراك ✓'); }
+          draw();
+        };
+      };
+      draw();
+    })();
 
     const noteEl=$('#acctNote');
     const refresh=()=>{ $('#acctAvatar').innerHTML=avatarInner(); const r=$('#acctRemove'); if(r) r.style.display=photo?'':'none'; };
@@ -2819,7 +2840,10 @@ const auth = getAuth(app);
   const EMAILJS = {
     publicKey:  'KN-SelriJR4jhYWoc', // ✓ تم
     serviceId:  'service_o0p48dy',    // ✓ تم
-    templateId: 'template_vxxti7l',   // ✓ تم
+    templateId: 'template_vxxti7l',   // ✓ تم — قالب إشعار الأدمن (طلبات الدفع)
+    // (اختياري) قالب مخصّص لإشعارات المستخدمين. لو عندك قالب تاني على EmailJS
+    // يستخدم {{to_email}} و{{title}} و{{message}} ضعه هنا؛ وإلا يُستخدم القالب الأساسي.
+    notifyTemplateId: 'YOUR_NOTIFY_TEMPLATE',
     toEmail:    'exeg540@gmail.com'    // البريد اللي يستقبل الإشعار
   };
   /* ▲▲▲ */
@@ -2835,6 +2859,122 @@ const auth = getAuth(app);
   }
   const CROWN='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 8.5 6.5 12l3.7-6 1.8 0L15.5 12l4-3.5-1.7 10.5H4.2L2.5 8.5Zm3.2 10.5h12.6"/></svg>';
   const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="26" height="26"><path d="M20 6 9 17l-5-5"/></svg>';
+
+  /* ======================================================================
+     NOTIFICATIONS — site announcements (bell), subscribe, + email delivery
+     Announcements are stored in RTDB (announcements/) so every visitor sees
+     them in-site via the bell. Subscribing asks the browser for permission
+     and records the opt-in (notifySubs/<uid>) so the admin can email the user.
+     ====================================================================== */
+  const BELL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>';
+  const NOTIF_SEEN_KEY='apb_notif_seen';
+  const NOTIF_OPTIN_KEY='apb_notif_optin';
+  const notifSeen   = ()=>{ try{ return +localStorage.getItem(NOTIF_SEEN_KEY)||0; }catch{ return 0; } };
+  const setNotifSeen= ts=>{ try{ localStorage.setItem(NOTIF_SEEN_KEY, String(ts||Date.now())); }catch{} };
+  const isSubscribed= ()=>{ try{ return localStorage.getItem(NOTIF_OPTIN_KEY)==='1'; }catch{ return false; } };
+
+  /* read announcements meant for everyone (or targeted at the current user) */
+  async function loadAnnouncements(){
+    try{
+      const s=await get(child(ref(db),'announcements'));
+      let list = s.exists()? Object.entries(s.val()).map(([id,v])=>({id,...v})) : [];
+      const uid = currentUser && currentUser.uid;
+      list = list.filter(a=> !a.uid || a.uid==='all' || a.uid===uid);
+      list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      return list;
+    }catch(e){ return []; }
+  }
+
+  /* opt in: ask the browser for permission + record the subscription */
+  async function subscribeNotifications(){
+    let perm='default';
+    try{ if('Notification' in window) perm = (Notification.permission==='granted') ? 'granted' : await Notification.requestPermission(); }catch(e){}
+    try{
+      if(currentUser) await set(ref(db,'notifySubs/'+currentUser.uid), {
+        username: currentUser.username||'', email: currentUser.email||'',
+        enabled: true, push: perm==='granted', at: Date.now()
+      });
+    }catch(e){ console.warn('subscribe save failed', e); }
+    try{ localStorage.setItem(NOTIF_OPTIN_KEY,'1'); }catch{}
+    return perm;
+  }
+  async function unsubscribeNotifications(){
+    try{ if(currentUser) await remove(ref(db,'notifySubs/'+currentUser.uid)); }catch(e){}
+    try{ localStorage.removeItem(NOTIF_OPTIN_KEY); }catch{}
+  }
+
+  /* update the bell badge, and (once per load) pop native OS notifications */
+  let _notifPopped=false;
+  async function refreshBell(){
+    if(!currentUser) return;
+    const list=await loadAnnouncements();
+    const seen=notifSeen();
+    const fresh=list.filter(a=>(a.createdAt||0)>seen);
+    const dot=$('#bellDot');
+    if(dot){ if(fresh.length){ dot.hidden=false; dot.textContent=fresh.length>9?'9+':String(fresh.length); } else { dot.hidden=true; dot.textContent=''; } }
+    if(!_notifPopped){
+      _notifPopped=true;
+      if('Notification' in window && Notification.permission==='granted' && isSubscribed()){
+        fresh.slice(0,3).forEach(a=>{ try{ new Notification(a.title||'إشعار جديد — elgoharyX',
+          { body:(a.body||'').slice(0,180), icon:LOGO, tag:'elgo-'+a.id }); }catch(e){} });
+      }
+    }
+  }
+
+  /* the notifications panel (bell) — shows announcements + a subscribe toggle */
+  function closeNotif(){ const o=$('#notifOv'); if(o) o.remove(); }
+  async function openNotifications(){
+    closeNotif();
+    const ov=document.createElement('div'); ov.className='overlay show'; ov.id='notifOv';
+    ov.innerHTML=`<div class="modal notif-modal">
+      <button class="close" data-notif-close aria-label="إغلاق">✕</button>
+      <div class="info-h">${BELL}<h3>الإشعارات</h3></div>
+      <div class="notif-sub" id="notifSubRow"></div>
+      <div class="notif-list" id="notifList"><div class="pm-note" style="text-align:center;padding:16px 0">جارٍ التحميل…</div></div>
+    </div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov||e.target.closest('[data-notif-close]')) closeNotif(); });
+    const drawSub=()=>{
+      const row=$('#notifSubRow'); if(!row) return; const on=isSubscribed();
+      row.innerHTML = on
+        ? `<span class="ns-on">${IC2.check||'✓'} أنت مشترك في إشعارات الموقع</span><button class="btn ghost" id="notifUnsub">إلغاء الاشتراك</button>`
+        : `<span class="ns-txt">اشترك لتصلك إشعارات الموقع الجديدة أولاً بأول.</span><button class="btn primary" id="notifSub">🔔 اشترك</button>`;
+      const s=$('#notifSub'); if(s) s.onclick=async()=>{ s.disabled=true; s.textContent='جارٍ التفعيل…';
+        const p=await subscribeNotifications(); toast(p==='granted'?'تم تفعيل الإشعارات ✓':'تم الاشتراك ✓'); drawSub(); };
+      const u=$('#notifUnsub'); if(u) u.onclick=async()=>{ await unsubscribeNotifications(); toast('تم إلغاء الاشتراك'); drawSub(); };
+    };
+    drawSub();
+    const list=await loadAnnouncements();
+    setNotifSeen(list.length?Math.max(...list.map(a=>a.createdAt||0)):Date.now());
+    const dot=$('#bellDot'); if(dot){ dot.hidden=true; dot.textContent=''; }
+    const el=$('#notifList'); if(!el) return;
+    el.innerHTML = list.length ? list.map(a=>`<div class="notif-item">
+        <div class="notif-t">${esc(a.title||'إشعار')}</div>
+        ${a.body?`<div class="notif-b">${esc(a.body)}</div>`:''}
+        <div class="notif-d">${fmtDay(a.createdAt)}</div>
+      </div>`).join('') : `<div class="pm-note" style="text-align:center;padding:22px 0">لا توجد إشعارات بعد.</div>`;
+  }
+
+  /* send a single notification email to a user via EmailJS (fire-and-forget).
+     Uses the dedicated notify template if configured; otherwise the main one. */
+  async function sendUserEmail(toEmail, title, body, toName){
+    if(!emailjsReady() || !toEmail) return false;
+    const tpl = (EMAILJS.notifyTemplateId && !EMAILJS.notifyTemplateId.startsWith('YOUR_'))
+      ? EMAILJS.notifyTemplateId : EMAILJS.templateId;
+    const params = {
+      to_email: toEmail, to_name: toName||'', email: toEmail, username: toName||'',
+      title: title, subject: title, message: body, note: body,
+      method: 'إشعار', amount: '', screenshot: '', link: urlHome()
+    };
+    try{
+      const r=await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ service_id:EMAILJS.serviceId, template_id:tpl, user_id:EMAILJS.publicKey, template_params:params })
+      });
+      return r.ok;
+    }catch(e){ console.warn('user email failed', e); return false; }
+  }
+
   let adminEmail = undefined; // undefined = not loaded yet, null = none
   async function loadAdminEmail(){
     try{ const s=await get(child(ref(db),'config/adminEmail')); adminEmail = s.exists()? String(s.val()).trim().toLowerCase() : null; }
@@ -2920,16 +3060,28 @@ const auth = getAuth(app);
     };
   }
 
+  /* grant / extend a premium subscription for a uid (shared by Payments + Users) */
+  async function adminGrantPremium(uid, done){
+    try{
+      const cur=await getPremium(uid);
+      const base=(cur && premiumActive(cur) && cur.expires)?cur.expires:Date.now();
+      const expires=base + PREMIUM.months*30*24*3600*1000;
+      const count=((cur && cur.count)?cur.count:0)+1;
+      await set(ref(db,'premium/'+uid), { active:true, plan:String(count>1?PREMIUM.renew:PREMIUM.first), since:(cur&&cur.since)||Date.now(), expires, count });
+      toast('تم تفعيل الاشتراك ✓'); done&&done();
+    }catch(e){ console.error(e); toast('تعذّر التفعيل — تأكد أنك داخل بحساب الأدمن'); }
+  }
+
   async function showAdmin(){
     if(!currentUser){ gotoLogin(); return; }
-    document.title='لوحة الأدمن — elgoharyX';
+    document.title='لوحة تحكّم الأدمن — elgoharyX';
     document.body.style.background='';
     $('#app').innerHTML = appbar('admin') + `<div class="wrap">${skelGrid(3)}</div>` + drawer('admin');
     wireAppbar();
     if(adminEmail===undefined) await loadAdminEmail();
     const fbAuthed = !!(auth && auth.currentUser);
-    // simple "set admin email" card — saves straight to config/adminEmail
-    const setupCard = () => `<div class="panel" style="max-width:560px;margin:0 auto 18px;padding:20px">
+    // "set admin email" card — saves straight to config/adminEmail
+    const setupCard = () => `<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
         <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">إعداد بريد الأدمن</h3>
         <div class="sub" style="margin-bottom:14px">اكتب بريد الأدمن واضغط حفظ — يُخزَّن في قاعدة البيانات تلقائياً.</div>
         ${adminEmail?`<div class="pm-note ok" style="margin-bottom:12px">الأدمن الحالي: <b dir="ltr">${esc(adminEmail)}</b></div>`:`<div class="pm-note" style="margin-bottom:12px">لم يُضبط الأدمن بعد — احفظ بريدك لتصبح الأدمن.</div>`}
@@ -2951,17 +3103,171 @@ const auth = getAuth(app);
     };
     if(!isAdmin()){
       $('#app').innerHTML = appbar('admin') + `<div class="wrap">${setupCard()}
-        <div class="mp-empty" style="max-width:560px;margin:0 auto">هذه اللوحة للأدمن فقط. بعد حفظ بريدك بالأعلى (وأنت داخل بجوجل) ستصبح الأدمن مباشرة.</div>
+        <div class="mp-empty" style="max-width:600px;margin:0 auto">هذه اللوحة للأدمن فقط. بعد حفظ بريدك بالأعلى (وأنت داخل بجوجل) ستصبح الأدمن مباشرة.</div>
       </div>` + drawer('admin');
       wireAppbar(); wireSetup(); return;
     }
-    const render=async()=>{
-      let list=[];
-      try{ const s=await get(child(ref(db),'paymentRequests')); list = s.exists()? Object.entries(s.val()).map(([id,v])=>({id,...v})) : []; }
-      catch(e){ console.error(e); $('#app').innerHTML=appbar('admin')+`<div class="wrap"><div class="mp-empty">تعذّر تحميل الطلبات.<br>تأكد أنك داخل بحساب الأدمن (Google/GitHub) وأن القواعد منشورة.</div></div>`+drawer('admin'); wireAppbar(); return; }
+
+    /* ---------- tabbed control center ---------- */
+    let TAB_ID='overview';
+    const TABS=[['overview','نظرة عامة'],['users','المستخدمون'],['profiles','البروفايلات'],
+      ['blogs','المدونات'],['payments','المدفوعات'],['notify','الإشعارات'],['config','الإعدادات']];
+    const shell=(inner)=> appbar('admin') + `<div class="wrap adm-wrap">
+      <div class="mp-head"><div><h2>لوحة تحكّم الأدمن</h2>
+        <div class="sub">راقب وتحكّم في الموقع بالكامل — المستخدمون، المحتوى، الاشتراكات، والإشعارات.</div></div></div>
+      <div class="adm-tabs">${TABS.map(t=>`<button class="adm-tab ${TAB_ID===t[0]?'on':''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
+      <div class="adm-body" id="admBody">${inner}</div>
+    </div>` + drawer('admin');
+    const busy = ()=>`<div class="pm-note" style="text-align:center;padding:34px 0">جارٍ التحميل…</div>`;
+    const bodyEl = ()=>$('#admBody');
+    const wireTabs = ()=>document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+    function setTab(id){
+      TAB_ID=id;
+      document.querySelectorAll('.adm-tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===id));
+      renderTab();
+    }
+    async function renderTab(){
+      const el=bodyEl(); if(!el) return; el.innerHTML=busy();
+      try{
+        if(TAB_ID==='overview')      await renderOverview(el);
+        else if(TAB_ID==='users')    await renderUsers(el);
+        else if(TAB_ID==='profiles') await renderProfiles(el);
+        else if(TAB_ID==='blogs')    await renderBlogs(el);
+        else if(TAB_ID==='payments') await renderPayments(el);
+        else if(TAB_ID==='notify')   await renderNotify(el);
+        else if(TAB_ID==='config'){  el.innerHTML=setupCard(); wireSetup(); }
+        wireTabLinks(el);
+      }catch(e){ console.error(e); el.innerHTML=`<div class="mp-empty">تعذّر التحميل — تأكد أنك داخل بحساب الأدمن (Google) وأن قواعد قاعدة البيانات المحدّثة منشورة.</div>`; }
+    }
+    const wireTabLinks = el=>el.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>setTab(b.dataset.goto));
+
+    /* ----- Overview ----- */
+    async function renderOverview(el){
+      const [uS,pS,bS,sS,payS]=await Promise.all([
+        get(child(ref(db),'users')).catch(()=>null),
+        get(child(ref(db),'profiles')).catch(()=>null),
+        get(child(ref(db),'blogIndex')).catch(()=>null),
+        get(child(ref(db),'notifySubs')).catch(()=>null),
+        get(child(ref(db),'paymentRequests')).catch(()=>null),
+      ]);
+      const cnt=s=>s&&s.exists()?Object.keys(s.val()).length:0;
+      const pays=payS&&payS.exists()?Object.values(payS.val()):[];
+      const pending=pays.filter(r=>r.status==='pending').length;
+      const cards=[['المستخدمون',cnt(uS),'users'],['البروفايلات',cnt(pS),'profiles'],
+        ['المدونات',cnt(bS),'blogs'],['المشتركون بالإشعارات',cnt(sS),'notify'],
+        ['طلبات قيد المراجعة',pending,'payments'],['إجمالي الطلبات',pays.length,'payments']];
+      el.innerHTML=`<div class="adm-stats">${cards.map(c=>`<button class="adm-stat" data-goto="${c[2]}"><b>${c[1]}</b><span>${c[0]}</span></button>`).join('')}</div>
+        <div class="pm-card" style="margin-top:18px"><h3>تحكّم سريع</h3>
+          <div class="adm-quick">
+            <button class="btn primary" data-goto="notify" style="width:auto">📢 إرسال إشعار للمستخدمين</button>
+            <button class="btn ghost" data-goto="payments" style="width:auto">مراجعة طلبات الاشتراك (${pending})</button>
+            <button class="btn ghost" data-goto="users" style="width:auto">إدارة المستخدمين</button>
+          </div></div>`;
+    }
+
+    /* ----- Users ----- */
+    async function renderUsers(el){
+      const [uS,premS]=await Promise.all([ get(child(ref(db),'users')), get(child(ref(db),'premium')).catch(()=>null) ]);
+      const prem=premS&&premS.exists()?premS.val():{};
+      let users=uS.exists()?Object.entries(uS.val()).map(([uid,v])=>({uid,...v})):[];
+      users.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+      const row=u=>{ const active=premiumActive(prem[u.uid]);
+        return `<div class="adm-user">
+          <div class="adm-uinfo">
+            <div class="adm-utop"><b>${esc(u.username||'مستخدم')}</b>${active?`<span class="pm-vip">${CROWN} مميز</span>`:''}</div>
+            <div class="adm-meta" dir="ltr">${esc(u.email||'—')}</div>
+            <div class="adm-uid">UID: <code>${esc(u.uid)}</code> · ${esc(u.provider||'بريد')} · ${fmtDay(u.createdAt)}</div>
+          </div>
+          <div class="adm-uacts">
+            ${active?`<button class="btn ghost" data-revoke="${esc(u.uid)}">إلغاء التمييز</button>`:`<button class="btn gold" data-grant="${esc(u.uid)}">تفعيل مميز</button>`}
+            <button class="btn ghost" data-mail="${esc(u.email||'')}" data-name="${esc(u.username||'')}">إشعار</button>
+            <button class="btn del" data-deluser="${esc(u.uid)}" data-email="${esc(u.email||'')}" data-uname="${esc(u.username||'')}">حذف</button>
+          </div></div>`; };
+      el.innerHTML=`<div class="adm-search"><input id="admUserSearch" placeholder="ابحث بالاسم أو البريد…" autocomplete="off"/></div>
+        <div class="adm-ulist" id="admUlist"></div>`;
+      const wire=()=>{
+        el.querySelectorAll('[data-grant]').forEach(b=>b.onclick=()=>{ if(confirm('تفعيل الاشتراك المميز لهذا المستخدم؟')) adminGrantPremium(b.dataset.grant,()=>renderUsers(el)); });
+        el.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{ if(!confirm('إلغاء العضوية المميزة لهذا المستخدم؟'))return;
+          try{ await set(ref(db,'premium/'+b.dataset.revoke),{active:false}); toast('تم الإلغاء'); renderUsers(el); }catch(e){ console.error(e); toast('تعذّر'); } });
+        el.querySelectorAll('[data-mail]').forEach(b=>b.onclick=()=>promptSend(b.dataset.mail,b.dataset.name));
+        el.querySelectorAll('[data-deluser]').forEach(b=>b.onclick=async()=>{
+          if(!confirm('حذف هذا المستخدم نهائياً؟\n(لن تُحذف بروفايلاته/مدونته تلقائياً)'))return;
+          const uid=b.dataset.deluser, email=b.dataset.email, uname=b.dataset.uname;
+          try{
+            await remove(ref(db,'users/'+uid));
+            if(email){ try{ await remove(ref(db,'emails/'+encEmail(email))); }catch(e){} }
+            if(uname){ try{ await remove(ref(db,'usernames/'+uname)); }catch(e){} }
+            try{ await remove(ref(db,'notifySubs/'+uid)); }catch(e){}
+            toast('تم حذف المستخدم'); renderUsers(el);
+          }catch(e){ console.error(e); toast('تعذّر الحذف'); }
+        });
+      };
+      const draw=arr=>{ $('#admUlist').innerHTML = arr.length?arr.map(row).join(''):'<div class="mp-empty">لا نتائج.</div>'; wire(); };
+      draw(users);
+      const sb=$('#admUserSearch'); if(sb) sb.oninput=()=>{ const q=sb.value.trim().toLowerCase();
+        draw(!q?users:users.filter(u=>((u.username||'')+' '+(u.email||'')).toLowerCase().includes(q))); };
+    }
+
+    /* ----- Profiles ----- */
+    async function renderProfiles(el){
+      const s=await get(child(ref(db),'profiles'));
+      let list=s.exists()?Object.entries(s.val()).map(([id,v])=>({id,...v})):[];
+      list.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+      const row=p=>`<div class="adm-citem">
+          <div class="adm-cthumb" style="background:${COVERS[p.template]||COVERS.royal}"></div>
+          <div class="adm-cinfo"><b>${esc(p.name||'بدون اسم')}</b>
+            <div class="adm-meta">${esc(p.ownerName||'')} · ${fmtDay(p.updatedAt)}</div>
+            <div class="adm-uid">ID: <code>${esc(p.id)}</code></div></div>
+          <div class="adm-cacts"><a class="btn ghost" href="${urlProfileView(p.id)}" target="_blank">عرض</a>
+            <button class="btn del" data-delpf="${esc(p.id)}" data-owner="${esc(p.ownerUid||'')}">حذف</button></div>
+        </div>`;
+      el.innerHTML=`<div class="adm-search"><input id="admPfSearch" placeholder="ابحث بالاسم أو المالك…" autocomplete="off"/></div>
+        <div class="adm-clist" id="admPflist"></div>`;
+      const draw=arr=>{ $('#admPflist').innerHTML=arr.length?arr.map(row).join(''):'<div class="mp-empty">لا نتائج.</div>';
+        el.querySelectorAll('[data-delpf]').forEach(b=>b.onclick=async()=>{ if(!confirm('حذف هذا البروفايل نهائياً؟'))return;
+          try{ await remove(ref(db,'profiles/'+b.dataset.delpf)); if(b.dataset.owner) try{ await remove(ref(db,'userProfiles/'+b.dataset.owner+'/'+b.dataset.delpf)); }catch(e){}
+            toast('تم الحذف'); renderProfiles(el); }catch(e){ console.error(e); toast('تعذّر'); } }); };
+      draw(list);
+      const sb=$('#admPfSearch'); if(sb) sb.oninput=()=>{ const q=sb.value.trim().toLowerCase();
+        draw(!q?list:list.filter(p=>((p.name||'')+' '+(p.ownerName||'')+' '+(p.id||'')).toLowerCase().includes(q))); };
+    }
+
+    /* ----- Blogs ----- */
+    async function renderBlogs(el){
+      const s=await get(child(ref(db),'blogIndex'));
+      let list=s.exists()?Object.entries(s.val()).map(([id,v])=>({id,...v})):[];
+      list.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+      const row=b=>`<div class="adm-citem">
+          <div class="adm-cthumb" style="background:${b.cover?`center/cover no-repeat url('${cssUrl(b.cover)}')`:(COVERS[b.design]||COVERS.royal)}"></div>
+          <div class="adm-cinfo"><b>${esc(b.title||'مدونة')}</b>
+            <div class="adm-meta">${esc(b.author||'')} · ${Number(b.count)||0} مقالة · ${fmtDay(b.updatedAt)}</div>
+            <div class="adm-uid">ID: <code>${esc(b.id)}</code></div></div>
+          <div class="adm-cacts"><a class="btn ghost" href="${urlBlogView(b.id)}" target="_blank">عرض</a>
+            <button class="btn del" data-delblog="${esc(b.id)}">حذف</button></div>
+        </div>`;
+      el.innerHTML=`<div class="adm-search"><input id="admBgSearch" placeholder="ابحث بعنوان المدونة أو الكاتب…" autocomplete="off"/></div>
+        <div class="adm-clist" id="admBglist"></div>`;
+      const draw=arr=>{ $('#admBglist').innerHTML=arr.length?arr.map(row).join(''):'<div class="mp-empty">لا نتائج.</div>';
+        el.querySelectorAll('[data-delblog]').forEach(b=>b.onclick=async()=>{ if(!confirm('حذف هذه المدونة نهائياً؟'))return;
+          const id=b.dataset.delblog;
+          try{
+            let owner=''; try{ const bs=await get(child(ref(db),'blogs/'+id)); if(bs.exists()) owner=bs.val().ownerUid||''; }catch(e){}
+            await remove(ref(db,'blogs/'+id)); await remove(ref(db,'blogIndex/'+id));
+            if(owner) try{ await remove(ref(db,'userBlogs/'+owner+'/'+id)); }catch(e){}
+            toast('تم الحذف'); renderBlogs(el);
+          }catch(e){ console.error(e); toast('تعذّر'); } }); };
+      draw(list);
+      const sb=$('#admBgSearch'); if(sb) sb.oninput=()=>{ const q=sb.value.trim().toLowerCase();
+        draw(!q?list:list.filter(b=>((b.title||'')+' '+(b.author||'')).toLowerCase().includes(q))); };
+    }
+
+    /* ----- Payments (subscription requests) ----- */
+    async function renderPayments(el){
+      const s=await get(child(ref(db),'paymentRequests'));
+      let list=s.exists()?Object.entries(s.val()).map(([id,v])=>({id,...v})):[];
       list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
       const pending=list.filter(r=>r.status==='pending').length;
-      const rows = list.length ? list.map(r=>`
+      const rows=list.length?list.map(r=>`
         <div class="adm-req ${esc(r.status||'pending')}">
           <a class="adm-shot" href="${esc(r.screenshot||'#')}" target="_blank">${r.screenshot?`<img src="${esc(r.screenshot)}" alt="إيصال" loading="lazy"/>`:'<span>لا صورة</span>'}</a>
           <div class="adm-info">
@@ -2970,35 +3276,100 @@ const auth = getAuth(app);
             ${r.note?`<div class="adm-note">📝 ${esc(r.note)}</div>`:''}
             <div class="adm-uid">UID: <code>${esc(r.uid)}</code></div>
             ${r.status==='pending'?`<div class="adm-acts"><button class="btn primary" data-approve="${esc(r.id)}" data-uid="${esc(r.uid)}">${CHECK} تأكيد وتفعيل</button><button class="btn ghost" data-reject="${esc(r.id)}">رفض</button></div>`:''}
-          </div>
-        </div>`).join('') : `<div class="mp-empty">لا توجد طلبات دفع بعد.</div>`;
-      $('#app').innerHTML = appbar('admin') + `<div class="wrap">
-        <div class="mp-head"><div><h2>لوحة الأدمن</h2><div class="sub">طلبات الاشتراك — راجِع الإيصال وأكّد المبلغ ثم فعّل.</div></div>
-          <span class="pm-vip">${pending} قيد المراجعة</span></div>
-        ${setupCard()}
-        <div class="adm-list">${rows}</div></div>` + drawer('admin');
-      wireAppbar(); wireSetup();
-      document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{
+          </div></div>`).join(''):`<div class="mp-empty">لا توجد طلبات دفع بعد.</div>`;
+      el.innerHTML=`<div class="adm-subhead"><span class="pm-vip">${pending} قيد المراجعة</span></div><div class="adm-list">${rows}</div>`;
+      el.querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{
         const id=b.dataset.approve, uid=b.dataset.uid;
         if(!confirm('تأكيد استلام المبلغ وتفعيل الاشتراك المميز لهذا المستخدم؟')) return;
         b.disabled=true;
-        try{
-          const cur=await getPremium(uid);
-          const base=(cur && premiumActive(cur) && cur.expires)?cur.expires:Date.now();
-          const expires=base + PREMIUM.months*30*24*3600*1000;
-          const count=((cur && cur.count)?cur.count:0)+1;
-          await set(ref(db,'premium/'+uid), { active:true, plan:String(count>1?PREMIUM.renew:PREMIUM.first), since:(cur&&cur.since)||Date.now(), expires, count });
-          await set(ref(db,'paymentRequests/'+id+'/status'),'approved');
-          toast('تم تفعيل الاشتراك ✓'); render();
-        }catch(e){ console.error(e); toast('تعذّر التفعيل — تأكد أنك داخل بحساب الأدمن'); b.disabled=false; }
+        try{ await adminGrantPremium(uid); await set(ref(db,'paymentRequests/'+id+'/status'),'approved'); renderPayments(el); }
+        catch(e){ console.error(e); toast('تعذّر التفعيل'); b.disabled=false; }
       });
-      document.querySelectorAll('[data-reject]').forEach(b=>b.onclick=async()=>{
+      el.querySelectorAll('[data-reject]').forEach(b=>b.onclick=async()=>{
         if(!confirm('رفض هذا الطلب؟')) return;
-        try{ await set(ref(db,'paymentRequests/'+b.dataset.reject+'/status'),'rejected'); toast('تم الرفض'); render(); }
+        try{ await set(ref(db,'paymentRequests/'+b.dataset.reject+'/status'),'rejected'); toast('تم الرفض'); renderPayments(el); }
         catch(e){ console.error(e); toast('تعذّر'); }
       });
-    };
-    render();
+    }
+
+    /* ----- Notifications (compose + send + history) ----- */
+    async function renderNotify(el){
+      el.innerHTML=`
+        <div class="pm-card"><h3>إرسال إشعار جديد</h3>
+          <div class="field"><label>العنوان</label><input id="ntTitle" placeholder="عنوان الإشعار" maxlength="140"/></div>
+          <div class="field"><label>النص</label><textarea id="ntBody" placeholder="اكتب رسالتك للمستخدمين…" maxlength="1000"></textarea></div>
+          <div class="field"><label>المُستَقبِلون</label>
+            <select id="ntAud" class="mini-select" style="width:100%">
+              <option value="all">كل المستخدمين</option>
+              <option value="subs">المشتركون في الإشعارات فقط</option>
+              <option value="one">مستخدم واحد (بالبريد)</option>
+            </select></div>
+          <div class="field" id="ntOneWrap" style="display:none"><label>بريد المستخدم</label><input id="ntOne" dir="ltr" placeholder="user@example.com"/></div>
+          <label class="adm-check"><input type="checkbox" id="ntEmail" checked/><span>إرسال عبر البريد الإلكتروني أيضاً</span></label>
+          <div class="pm-note" id="ntMsg"></div>
+          <button class="btn primary" id="ntSend" style="width:100%">📢 إرسال الإشعار</button>
+          <div class="pm-note2">يظهر الإشعار داخل الموقع لكل مستخدم عبر جرس الإشعارات، ويُرسَل بالبريد عند تفعيل الخيار.</div>
+        </div>
+        <div class="pm-card"><h3>الإشعارات المُرسَلة</h3><div id="ntList">${busy()}</div></div>`;
+      const audSel=$('#ntAud'); audSel.onchange=()=>{ $('#ntOneWrap').style.display = audSel.value==='one'?'':'none'; };
+      $('#ntSend').onclick=async()=>{
+        const title=($('#ntTitle').value||'').trim(), bodyv=($('#ntBody').value||'').trim(), msg=$('#ntMsg');
+        if(!title){ msg.className='pm-note'; msg.textContent='اكتب عنوان الإشعار'; return; }
+        const aud=audSel.value, wantEmail=$('#ntEmail').checked;
+        const btn=$('#ntSend'); btn.disabled=true; const old=btn.textContent; btn.textContent='جارٍ الإرسال…';
+        try{
+          let targetUid='all', recipients=[];
+          if(aud==='one'){
+            const em=($('#ntOne').value||'').trim().toLowerCase();
+            if(!em){ msg.className='pm-note'; msg.textContent='اكتب بريد المستخدم'; btn.disabled=false; btn.textContent=old; return; }
+            targetUid=(await emailToUid(em))||'all'; recipients=[{email:em,username:''}];
+          }else if(aud==='subs'){
+            const s=await get(child(ref(db),'notifySubs')).catch(()=>null);
+            recipients=s&&s.exists()?Object.values(s.val()).filter(x=>x.email).map(x=>({email:x.email,username:x.username||''})):[];
+          }else{
+            const s=await get(child(ref(db),'users')).catch(()=>null);
+            recipients=s&&s.exists()?Object.values(s.val()).filter(x=>x.email).map(x=>({email:x.email,username:x.username||''})):[];
+          }
+          const id=shortId(14);
+          await set(ref(db,'announcements/'+id), { title:title.slice(0,140), body:bodyv.slice(0,1000), uid:targetUid, by:(currentUser.email||'admin'), createdAt:Date.now() });
+          let sent=0;
+          if(wantEmail && emailjsReady()){ for(const r of recipients){ if(await sendUserEmail(r.email,title,bodyv,r.username)) sent++; } }
+          msg.className='pm-note ok';
+          msg.textContent = wantEmail ? (emailjsReady()?`✓ تم النشر داخل الموقع وإرسال ${sent} بريد`:'✓ تم النشر داخل الموقع (فعّل EmailJS لإرسال البريد)') : '✓ تم نشر الإشعار داخل الموقع';
+          $('#ntTitle').value=''; $('#ntBody').value=''; toast('تم إرسال الإشعار ✓'); loadNtList();
+        }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent='تعذّر الإرسال — تأكد من نشر القواعد وأنك أدمن'; }
+        finally{ btn.disabled=false; btn.textContent=old; }
+      };
+      const loadNtList=async()=>{
+        const box=$('#ntList'); if(!box) return;
+        try{ const s=await get(child(ref(db),'announcements'));
+          let list=s.exists()?Object.entries(s.val()).map(([id,v])=>({id,...v})):[];
+          list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+          box.innerHTML=list.length?list.map(a=>`<div class="adm-nrow">
+            <div class="adm-ninfo"><b>${esc(a.title||'')}</b>${a.body?`<span>${esc(a.body.slice(0,120))}</span>`:''}
+              <div class="adm-uid">${a.uid&&a.uid!=='all'?'مستخدم محدّد':'الكل'} · ${fmtDay(a.createdAt)}</div></div>
+            <button class="btn del" data-delnt="${esc(a.id)}">حذف</button></div>`).join(''):'<div class="mp-empty">لا إشعارات مُرسَلة بعد.</div>';
+          box.querySelectorAll('[data-delnt]').forEach(b=>b.onclick=async()=>{ if(!confirm('حذف هذا الإشعار؟'))return;
+            try{ await remove(ref(db,'announcements/'+b.dataset.delnt)); toast('تم الحذف'); loadNtList(); }catch(e){ toast('تعذّر'); } });
+        }catch(e){ box.innerHTML='<div class="mp-empty">تعذّر التحميل.</div>'; }
+      };
+      loadNtList();
+    }
+
+    /* quick single-user notification (from the Users tab) */
+    function promptSend(email, name){
+      if(!email){ toast('هذا المستخدم بلا بريد'); return; }
+      const title=prompt('عنوان الإشعار:'); if(title===null||!title.trim()) return;
+      const body=(prompt('نص الإشعار (اختياري):')||'').trim();
+      const t=title.trim();
+      emailToUid(email.toLowerCase()).then(uid=>{ const id=shortId(14);
+        set(ref(db,'announcements/'+id),{ title:t.slice(0,140), body:body.slice(0,1000), uid:uid||'all', by:(currentUser.email||'admin'), createdAt:Date.now() }).catch(()=>{});
+      });
+      sendUserEmail(email,t,body,name).then(ok=>toast(ok?'تم إرسال الإشعار والبريد ✓':'تم نشر الإشعار (فعّل EmailJS للبريد)'));
+    }
+
+    $('#app').innerHTML = shell(busy()); wireAppbar(); wireTabs();
+    renderTab();
   }
 
   /* ---------- router (multi-page) ----------

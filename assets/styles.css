@@ -1931,3 +1931,96 @@
 
   /* premium perk: hide the elgoharyX promo on a premium owner's public blog */
   .blog.owner-premium .bt-cta{display:none}
+
+  /* ======================================================================
+     NOTIFICATIONS (bell + panel) + ADMIN CONTROL CENTER
+     ====================================================================== */
+  /* bell in the app bar */
+  .ab-bell svg{width:18px;height:18px}
+  .bell-dot{position:absolute;top:-5px;left:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:100px;
+    background:linear-gradient(120deg,#e0687a,#c8384a);color:#fff;font-size:10.5px;font-weight:700;
+    display:inline-flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 2px 8px -1px rgba(200,56,74,.6)}
+
+  /* notifications modal (reuses .overlay/.modal) */
+  .notif-modal{max-width:480px}
+  .notif-sub{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--stroke);border-radius:12px;
+    padding:12px 14px;margin-bottom:14px;background:rgba(255,255,255,.02);font-size:13px;color:var(--muted)}
+  .notif-sub .ns-txt{flex:1;min-width:120px}
+  .notif-sub .ns-on{flex:1;min-width:120px;color:#7ee0a8;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+  .notif-sub .btn{width:auto;padding:8px 16px;font-size:13px}
+  .notif-list{display:flex;flex-direction:column;gap:10px;max-height:52vh;overflow-y:auto}
+  .notif-item{border:1px solid var(--stroke);border-radius:12px;padding:12px 14px;background:rgba(255,255,255,.02)}
+  .notif-item .notif-t{font-weight:700;color:var(--txt);font-size:14.5px;margin-bottom:4px}
+  .notif-item .notif-b{color:var(--muted);font-size:13px;line-height:1.75;white-space:pre-wrap}
+  .notif-item .notif-d{color:var(--muted-2);font-size:11.5px;margin-top:7px}
+
+  /* account page: subscribe row */
+  .acct-notify-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    border:1px solid var(--stroke);border-radius:12px;padding:12px 14px;margin:0 0 16px;background:rgba(255,255,255,.02)}
+  .acct-notify-row .an-lbl{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--txt)}
+  .acct-notify-row .an-lbl svg{width:18px;height:18px;color:var(--gold-2)}
+
+  /* admin tabs */
+  .adm-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;border-bottom:1px solid var(--stroke-soft);padding-bottom:12px}
+  .adm-tab{border:1px solid var(--stroke);background:transparent;color:var(--muted);cursor:pointer;
+    font-family:inherit;font-weight:600;font-size:13.5px;padding:9px 16px;border-radius:100px;transition:.18s}
+  .adm-tab:hover{color:var(--txt);border-color:var(--gold)}
+  .adm-tab.on{color:#1a1300;background:linear-gradient(120deg,var(--gold),var(--gold-2));border-color:transparent}
+  .adm-subhead{margin-bottom:14px}
+
+  /* overview stats */
+  .adm-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+  .adm-stat{border:1px solid var(--stroke);border-radius:16px;padding:20px 16px;background:linear-gradient(180deg,var(--panel),var(--bg-2));
+    cursor:pointer;text-align:center;transition:.18s;font-family:inherit}
+  .adm-stat:hover{border-color:var(--gold);transform:translateY(-2px)}
+  .adm-stat b{display:block;font-family:"Space Grotesk";font-weight:700;font-size:30px;color:var(--gold-2);line-height:1}
+  .adm-stat span{display:block;color:var(--muted);font-size:12.5px;margin-top:7px}
+  .adm-quick{display:flex;gap:10px;flex-wrap:wrap}
+  .adm-quick .btn{padding:11px 18px;font-size:13.5px}
+
+  /* admin search box */
+  .adm-search{margin-bottom:14px}
+  .adm-search input{width:100%;font-family:inherit;font-size:14px;color:var(--txt);background:rgba(255,255,255,.04);
+    border:1px solid var(--stroke);border-radius:12px;padding:12px 14px}
+  .adm-search input:focus{outline:none;border-color:var(--gold)}
+
+  /* users list */
+  .adm-ulist{display:flex;flex-direction:column;gap:10px}
+  .adm-user{display:flex;gap:14px;justify-content:space-between;align-items:center;flex-wrap:wrap;
+    border:1px solid var(--stroke);border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.02)}
+  .adm-uinfo{min-width:0;flex:1}
+  .adm-utop{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14.5px}
+  .adm-uacts{display:flex;gap:8px;flex-wrap:wrap}
+  .adm-uacts .btn{width:auto;padding:8px 14px;font-size:12.5px}
+
+  /* profiles / blogs content lists */
+  .adm-clist{display:flex;flex-direction:column;gap:10px}
+  .adm-citem{display:flex;gap:12px;align-items:center;border:1px solid var(--stroke);border-radius:14px;
+    padding:10px 12px;background:rgba(255,255,255,.02)}
+  .adm-cthumb{flex:none;width:56px;height:56px;border-radius:11px;border:1px solid var(--stroke)}
+  .adm-cinfo{flex:1;min-width:0}
+  .adm-cinfo b{display:block;font-size:14.5px;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .adm-cacts{display:flex;gap:8px;flex-wrap:wrap}
+  .adm-cacts .btn{width:auto;padding:8px 14px;font-size:12.5px}
+
+  /* sent-announcements rows */
+  .adm-nrow{display:flex;gap:12px;justify-content:space-between;align-items:center;border:1px solid var(--stroke);
+    border-radius:12px;padding:11px 13px;margin-bottom:10px;background:rgba(255,255,255,.02)}
+  .adm-ninfo{min-width:0;flex:1}
+  .adm-ninfo b{display:block;font-size:14px}
+  .adm-ninfo span{display:block;color:var(--muted);font-size:12.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .adm-nrow .btn{width:auto;padding:8px 14px;font-size:12.5px}
+
+  /* email checkbox row */
+  .adm-check{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--muted);margin:2px 0 14px;cursor:pointer}
+  .adm-check input{width:17px;height:17px;accent-color:var(--gold)}
+
+  /* red "delete" button variant */
+  .btn.del{background:transparent;border:1px solid rgba(224,104,122,.4);color:#e0687a}
+  .btn.del:hover{border-color:#e0687a;background:rgba(224,104,122,.1)}
+
+  @media(max-width:600px){
+    .adm-user,.adm-nrow{flex-direction:column;align-items:stretch}
+    .adm-uacts,.adm-cacts{justify-content:flex-start}
+    .adm-citem{flex-wrap:wrap}
+  }
