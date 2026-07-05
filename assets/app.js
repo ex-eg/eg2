@@ -2956,15 +2956,27 @@ const auth = getAuth(app);
   }
 
   /* send a single notification email to a user via EmailJS (fire-and-forget).
-     Uses the dedicated notify template if configured; otherwise the main one. */
+     Uses the dedicated notify template if configured; otherwise the main one.
+     The message is sent under EVERY common variable name (message/content/text/
+     note/body/msg) plus a combined title+body — so it shows no matter which
+     variable the EmailJS template happens to reference. */
   async function sendUserEmail(toEmail, title, body, toName){
     if(!emailjsReady() || !toEmail) return false;
     const tpl = (EMAILJS.notifyTemplateId && !EMAILJS.notifyTemplateId.startsWith('YOUR_'))
       ? EMAILJS.notifyTemplateId : EMAILJS.templateId;
+    const bodyText = (body && body.trim()) ? body : title;   // never empty
+    const full = (body && body.trim()) ? (title + '\n\n' + body) : title;
     const params = {
-      to_email: toEmail, to_name: toName||'', email: toEmail, username: toName||'',
-      title: title, subject: title, message: body, note: body,
-      method: 'إشعار', amount: '', screenshot: '', link: urlHome()
+      // recipient (different templates use different names)
+      to_email: toEmail, to_name: toName||'', email: toEmail, name: toName||'', username: toName||'',
+      // title / subject
+      title: title, subject: title, header: title, from_name: 'elgoharyX',
+      // body — under every common name so any template renders it
+      message: bodyText, content: bodyText, text: bodyText, body: bodyText, msg: bodyText,
+      // the payment-style template shows {{note}} — put the whole thing there
+      note: full,
+      // harmless extras kept so the fallback payment template renders cleanly
+      method: '📢 إشعار', amount: '', screenshot: '', link: urlHome()
     };
     try{
       const r=await fetch('https://api.emailjs.com/api/v1.0/email/send', {
