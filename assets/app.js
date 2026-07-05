@@ -2,6 +2,7 @@
    Single source of truth for the database connection. Every module that needs
    the DB imports `db` and the helpers from here instead of re-initializing. */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app-check.js";
 import { getDatabase, ref, set, get, child, remove } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -16,6 +17,22 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+/* App Check — attests that requests come from the real elgoharyX site (registered
+   with this reCAPTCHA v3 key, restricted to ex-eg.github.io). Once App Check is set
+   to "Enforce" for Realtime Database, requests without a valid token are rejected.
+   For local testing (localhost), set a debug token — see note in the docs. */
+try {
+  // Optional: enable an App Check debug token on localhost so local dev keeps working.
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider('6LdjuUUtAAAAAG9D85LTSaK0HM5UoIrzgHnHB5DG'),
+    isTokenAutoRefreshEnabled: true
+  });
+} catch (e) { console.warn('App Check init skipped:', e); }
+
 const db = getDatabase(app);
 
   /* ---------- multi-page site links ----------
