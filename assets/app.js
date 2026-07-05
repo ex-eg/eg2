@@ -2936,8 +2936,9 @@ const auth = getAuth(app);
       $('#app').innerHTML = appbar('admin') + `<div class="wrap">
         <div class="mp-head"><div><h2>لوحة الأدمن</h2><div class="sub">طلبات الاشتراك — راجِع الإيصال وأكّد المبلغ ثم فعّل.</div></div>
           <span class="pm-vip">${pending} قيد المراجعة</span></div>
+        ${setupCard()}
         <div class="adm-list">${rows}</div></div>` + drawer('admin');
-      wireAppbar();
+      wireAppbar(); wireSetup();
       document.querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{
         const id=b.dataset.approve, uid=b.dataset.uid;
         if(!confirm('تأكيد استلام المبلغ وتفعيل الاشتراك المميز لهذا المستخدم؟')) return;
