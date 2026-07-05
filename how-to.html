@@ -81,9 +81,9 @@
   </header>
   <main class="doc">
     <div class="crumb"><a href="index.html">الرئيسية</a> ← <span>كيفية الاستخدام</span></div>
-    <h1>كيفية الاستخدام</h1>
-    <p class="lead">دليل مبسّط لإنشاء بروفايلك ومدونتك على elgoharyX ومشاركتهما في دقائق.</p>
-    <div class="panel"><div class="info-body" style="margin:0">
+    <h1 class="reveal">كيفية الاستخدام</h1>
+    <p class="lead reveal">دليل مبسّط لإنشاء بروفايلك ومدونتك على elgoharyX ومشاركتهما في دقائق.</p>
+    <div class="panel reveal" data-d="1"><div class="info-body" style="margin:0">
     <h4>إنشاء بروفايل أكاديمي</h4>
     <div class="step"><span class="n">1</span><div class="stx"><b>سجّل الدخول</b>أنشئ حساباً مجانياً أو ادخل بحسابك الحالي.</div></div>
     <div class="step"><span class="n">2</span><div class="stx"><b>ابدأ بروفايلاً جديداً</b>اضغط «أنشئ بروفايل» من الشريط العلوي.</div></div>
@@ -108,6 +108,7 @@
     try{ if(localStorage.getItem('apb_mode')==='light') document.documentElement.setAttribute('data-mode','light'); }catch(e){}
     try{ if(localStorage.getItem('apb_session_uid')){ var a=document.getElementById('acctLink'); if(a){ a.textContent='حسابي'; a.href='my-profiles.html'; } } }catch(e){}
   </script>
+  <script src="assets/fx.js"></script>
   <script src="assets/pwa.js"></script>
 </body>
 </html>

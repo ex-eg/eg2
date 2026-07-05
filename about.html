@@ -74,9 +74,9 @@
   </header>
   <main class="doc">
     <div class="crumb"><a href="index.html">الرئيسية</a> ← <span>عن elgoharyX</span></div>
-    <h1>عن elgoharyX</h1>
-    <p class="lead">elgoharyX منصّة عربية مجانية تمنح الأساتذة والباحثين وصنّاع المحتوى حضوراً رقمياً أنيقاً في دقائق.</p>
-    <div class="panel"><div class="info-body" style="margin:0">
+    <h1 class="reveal">عن elgoharyX</h1>
+    <p class="lead reveal">elgoharyX منصّة عربية مجانية تمنح الأساتذة والباحثين وصنّاع المحتوى حضوراً رقمياً أنيقاً في دقائق.</p>
+    <div class="panel reveal" data-d="1"><div class="info-body" style="margin:0">
     <h4>ما هو elgoharyX؟</h4>
     <p><b>elgoharyX</b> (يُكتب أحياناً «الجوهري إكس» أو elgohary) منصّة عربية مجانية تتيح لك إنشاء <b>بروفايل أكاديمي احترافي</b> و<b>مدونة إلكترونية</b> أنيقة، ومشاركتهما مع العالم عبر رابط دائم قابل للتعديل.</p>
     <h4>ماذا يقدّم الموقع؟</h4>
@@ -104,6 +104,7 @@
     try{ if(localStorage.getItem('apb_mode')==='light') document.documentElement.setAttribute('data-mode','light'); }catch(e){}
     try{ if(localStorage.getItem('apb_session_uid')){ var a=document.getElementById('acctLink'); if(a){ a.textContent='حسابي'; a.href='my-profiles.html'; } } }catch(e){}
   </script>
+  <script src="assets/fx.js"></script>
   <script src="assets/pwa.js"></script>
 </body>
 </html>

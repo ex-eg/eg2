@@ -74,9 +74,9 @@
   </header>
   <main class="doc">
     <div class="crumb"><a href="index.html">الرئيسية</a> ← <span>الدعم والمساعدة</span></div>
-    <h1>الدعم والمساعدة</h1>
-    <p class="lead">واجهت مشكلة أو لديك اقتراح؟ إليك الحلول وطرق التواصل.</p>
-    <div class="panel"><div class="info-body" style="margin:0">
+    <h1 class="reveal">الدعم والمساعدة</h1>
+    <p class="lead reveal">واجهت مشكلة أو لديك اقتراح؟ إليك الحلول وطرق التواصل.</p>
+    <div class="panel reveal" data-d="1"><div class="info-body" style="margin:0">
     <h4>مشكلات شائعة</h4>
     <ul><li><b>لا يُحفظ المحتوى:</b> تأكد من تسجيل الدخول ومن اتصالك بالإنترنت.</li>
     <li><b>لم يُختصر الرابط:</b> يعمل الاختصار تلقائياً بعد رفع الموقع على استضافة تدعم https.</li>
@@ -95,6 +95,7 @@
     try{ if(localStorage.getItem('apb_mode')==='light') document.documentElement.setAttribute('data-mode','light'); }catch(e){}
     try{ if(localStorage.getItem('apb_session_uid')){ var a=document.getElementById('acctLink'); if(a){ a.textContent='حسابي'; a.href='my-profiles.html'; } } }catch(e){}
   </script>
+  <script src="assets/fx.js"></script>
   <script src="assets/pwa.js"></script>
 </body>
 </html>

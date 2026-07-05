@@ -74,9 +74,9 @@
   </header>
   <main class="doc">
     <div class="crumb"><a href="index.html">الرئيسية</a> ← <span>سياسة الخصوصية</span></div>
-    <h1>سياسة الخصوصية</h1>
-    <p class="lead">نحرص على خصوصيتك — إليك ما نتعامل معه من بيانات وكيف نستخدمه.</p>
-    <div class="panel"><div class="info-body" style="margin:0">
+    <h1 class="reveal">سياسة الخصوصية</h1>
+    <p class="lead reveal">نحرص على خصوصيتك — إليك ما نتعامل معه من بيانات وكيف نستخدمه.</p>
+    <div class="panel reveal" data-d="1"><div class="info-body" style="margin:0">
     <h4>البيانات التي نجمعها</h4>
     <ul><li>اسم المستخدم والبريد الإلكتروني عند إنشاء الحساب.</li>
     <li>محتوى البروفايل والمدونة الذي تُدخله بنفسك.</li></ul>
@@ -101,6 +101,7 @@
     try{ if(localStorage.getItem('apb_mode')==='light') document.documentElement.setAttribute('data-mode','light'); }catch(e){}
     try{ if(localStorage.getItem('apb_session_uid')){ var a=document.getElementById('acctLink'); if(a){ a.textContent='حسابي'; a.href='my-profiles.html'; } } }catch(e){}
   </script>
+  <script src="assets/fx.js"></script>
   <script src="assets/pwa.js"></script>
 </body>
 </html>
