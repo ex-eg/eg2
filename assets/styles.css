@@ -1582,6 +1582,15 @@
       animation:sheen 2.6s ease-in-out infinite}
   }
 
+  /* ---------- social sign-in buttons ---------- */
+  .auth-or{display:flex;align-items:center;gap:12px;color:var(--muted-2);font-size:12.5px;margin:18px 0 4px}
+  .auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:var(--stroke)}
+  .btn.oauth{width:100%;justify-content:center;gap:10px;margin-top:10px;font-weight:600;
+    background:rgba(255,255,255,.03);border:1px solid var(--stroke);color:var(--txt)}
+  .btn.oauth:hover{border-color:var(--gold);background:rgba(255,255,255,.06);transform:translateY(-1px)}
+  .btn.oauth svg{width:19px;height:19px;flex:none}
+  html[data-mode="light"] .btn.oauth{background:#fff;border-color:var(--stroke)}
+
   /* =====================================================================
      BLOG EXTRAS — news ticker, search box, sidebar, 3D tilt, entrance anim
      ===================================================================== */

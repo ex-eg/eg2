@@ -4,6 +4,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app-check.js";
 import { getDatabase, ref, set, get, child, remove } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
+import { getAuth, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDynVoQRSD9icEcXfEz8Fdjms-sNd9gz9Y",
@@ -34,6 +35,7 @@ try {
 } catch (e) { console.warn('App Check init skipped:', e); }
 
 const db = getDatabase(app);
+const auth = getAuth(app);
 
   /* ---------- multi-page site links ----------
      Every section lives in its own HTML file in the same folder. ROOT is that
@@ -869,7 +871,7 @@ const db = getDatabase(app);
     // for SEO + crawlability) — the browser handles them. Here we only wire the
     // in-page controls: theme toggle, logout, and the mobile drawer.
     document.querySelectorAll('[data-act="mode"]').forEach(b=>b.onclick=toggleMode);
-    document.querySelectorAll('[data-act="logout"]').forEach(b=>b.onclick=()=>{ clearSession(); currentUser=null; toast('تم تسجيل الخروج'); location.href=urlHome(); });
+    document.querySelectorAll('[data-act="logout"]').forEach(b=>b.onclick=()=>{ try{ signOut(auth); }catch(e){} clearSession(); currentUser=null; toast('تم تسجيل الخروج'); location.href=urlHome(); });
     const dw=$('#drawerWrap');
     document.querySelectorAll('[data-act="menu"]').forEach(b=>b.onclick=()=>{ if(dw) dw.classList.add('open'); });
     document.querySelectorAll('[data-act="menu-close"]').forEach(b=>b.onclick=()=>{ if(dw) dw.classList.remove('open'); });
@@ -885,6 +887,43 @@ const db = getDatabase(app);
     if(c.includes('network')) return 'تعذّر الاتصال بالشبكة';
     return 'حدث خطأ، حاول مجدداً';
   }
+  /* ---------- sign in with Google / GitHub (Firebase Auth) ----------
+     On first sign-in we create a users/<firebase-uid> record so OAuth accounts
+     plug into the same account model (userProfiles/<uid>, userBlogs/<uid>). */
+  function oauthError(e){
+    const c=(e&&e.code)||'';
+    if(c==='auth/popup-closed-by-user'||c==='auth/cancelled-popup-request') return 'أُغلقت نافذة الدخول قبل إتمامها';
+    if(c==='auth/account-exists-with-different-credential') return 'هذا البريد مسجّل بطريقة دخول أخرى — استخدمها';
+    if(c==='auth/operation-not-allowed') return 'طريقة الدخول غير مفعّلة — فعّلها في Firebase Authentication';
+    if(c==='auth/unauthorized-domain') return 'هذا النطاق غير مصرّح به في إعدادات Firebase Auth';
+    if(c==='auth/popup-blocked') return 'المتصفح منع النافذة المنبثقة — اسمح بها وأعد المحاولة';
+    return 'تعذّر تسجيل الدخول، حاول مجدداً';
+  }
+  async function oauthSignIn(which, btn){
+    const err=$('#authErr'); if(err) err.textContent='';
+    const provider = which==='github' ? new GithubAuthProvider() : new GoogleAuthProvider();
+    const old = btn?btn.innerHTML:''; if(btn){ btn.disabled=true; btn.innerHTML='جارٍ فتح نافذة الدخول…'; }
+    try{
+      const res = await signInWithPopup(auth, provider);
+      const u = res.user, uid = u.uid, email = u.email || '';
+      let rec = await loadUserRecord(uid);
+      if(!rec){
+        const uname = String(u.displayName || (email? email.split('@')[0] : 'user')).slice(0,40) || 'user';
+        rec = { username:uname, email, provider:which, createdAt:Date.now() };
+        await set(ref(db,'users/'+uid), rec);
+        if(email){ try{ await set(ref(db,'emails/'+encEmail(email)), uid); }catch(e){} }
+      }
+      currentUser = { uid, email:rec.email||email, username:rec.username||'مستخدم' };
+      saveSession(uid);
+      toast('تم تسجيل الدخول ✓'); route();
+    }catch(e){
+      console.error(e); if(err) err.textContent=oauthError(e);
+      if(btn){ btn.disabled=false; btn.innerHTML=old; }
+    }
+  }
+  const GOOGLE_SVG='<svg viewBox="0 0 24 24" width="19" height="19"><path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2c-.3 1.4-1.1 2.6-2.3 3.4v2.8h3.7C21.7 18.6 23 15.8 23 12.3Z"/><path fill="#34A853" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.8c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.8H1.7v2.9C3.6 21.4 7.5 24 12 24Z"/><path fill="#FBBC05" d="M5.6 14.7c-.2-.7-.4-1.4-.4-2.2s.1-1.5.4-2.2V7.4H1.7C.9 8.9.5 10.4.5 12s.4 3.1 1.2 4.6l3.9-2.9Z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.2 15.1 0 12 0 7.5 0 3.6 2.6 1.7 6.4l3.9 3C6.5 6.8 9 4.8 12 4.8Z"/></svg>';
+  const GITHUB_SVG='<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>';
+
   function showAuth(mode='login'){
     document.title='تسجيل الدخول — منشئ البروفايلات';
     document.body.style.background='';
@@ -903,8 +942,13 @@ const db = getDatabase(app);
       <div class="field"><label>البريد الإلكتروني</label><input id="a-email" type="email" placeholder="name@example.com" autocomplete="email"/></div>
       <div class="field"><label>كلمة المرور</label><input id="a-pass" type="password" placeholder="6 أحرف على الأقل" autocomplete="current-password"/></div>
       <button class="btn primary" id="authGo">${mode==='login'?'دخول':'إنشاء الحساب'}</button>
+      <div class="auth-or"><span>أو تابع عبر</span></div>
+      <button class="btn oauth oauth-google" id="authGoogle" type="button">${GOOGLE_SVG} المتابعة بحساب Google</button>
+      <button class="btn oauth oauth-github" id="authGithub" type="button">${GITHUB_SVG} المتابعة بحساب GitHub</button>
     </div></div>`;
     wireAppbar();
+    $('#authGoogle')&&($('#authGoogle').onclick=e=>oauthSignIn('google',e.currentTarget));
+    $('#authGithub')&&($('#authGithub').onclick=e=>oauthSignIn('github',e.currentTarget));
 
     let cur=mode;
     const setMode=m=>{ cur=m;
