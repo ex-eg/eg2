@@ -1899,5 +1899,31 @@
   .adm-acts .btn.primary svg{width:16px;height:16px}
   @media(max-width:600px){ .adm-req{flex-direction:column} .adm-shot{width:100%;height:160px} }
 
+  /* premium button in the top app bar */
+  .ab-vip{display:inline-flex;align-items:center;gap:5px;color:var(--gold-2)!important;border-color:rgba(201,165,72,.4)!important}
+  .ab-vip:hover{border-color:var(--gold)!important;background:color-mix(in srgb,var(--gold) 10%,transparent)!important}
+  .ab-vip svg{width:15px;height:15px;fill:currentColor}
+
+  /* small lock chip shown on premium-gated controls for free users */
+  .lock-chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:var(--gold-2);
+    background:color-mix(in srgb,var(--gold) 14%,transparent);border:1px solid rgba(201,165,72,.4);padding:2px 8px;border-radius:100px;white-space:nowrap}
+  .lock-chip svg{width:11px;height:11px}
+  .is-locked{opacity:.55;pointer-events:none}
+  .gate-note{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px dashed rgba(201,165,72,.5);border-radius:12px;
+    padding:12px 14px;margin:6px 0 14px;font-size:13px;color:var(--muted);background:color-mix(in srgb,var(--gold) 6%,transparent)}
+  .gate-note a{color:var(--gold-2);font-weight:600;text-decoration:none;white-space:nowrap}
+
+  /* premium-gated designs: lock overlay shown only for free users */
+  .bd-swatch .sw-lock{position:absolute;inset:0;display:none;place-items:center;background:rgba(0,0,0,.45);color:var(--gold-2)}
+  .bd-swatch .sw-lock svg{width:16px;height:16px}
+  .user-free .bd-swatch.locked .sw-lock{display:grid}
+  .user-free .bd-swatch.locked{opacity:.7}
+  .lay{position:relative}
+  .lay .lay-lock{position:absolute;top:6px;left:6px;display:none;color:var(--gold-2)}
+  .user-free .lay.locked .lay-lock{display:block}
+  .user-free .lay.locked{opacity:.7}
+  /* code blocks in articles are premium — hide the buttons for free users */
+  .user-free .rte-btn[data-codeblock],.user-free .rte-btn[data-codeinline]{display:none}
+
   /* premium perk: hide the elgoharyX promo on a premium owner's public blog */
   .blog.owner-premium .bt-cta{display:none}

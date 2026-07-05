@@ -4,7 +4,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app-check.js";
 import { getDatabase, ref, set, get, child, remove } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
-import { getAuth, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDynVoQRSD9icEcXfEz8Fdjms-sNd9gz9Y",
@@ -645,7 +645,7 @@ const auth = getAuth(app);
   const clearSession=()=>{ try{ localStorage.removeItem(SESSION_KEY); localStorage.removeItem(USER_KEY); }catch{} };
   /* cache the logged-in user locally so pages render INSTANTLY without waiting on
      a (possibly slow) network read of users/<uid>. Refreshed in the background. */
-  const cacheUser=u=>{ try{ localStorage.setItem(USER_KEY, JSON.stringify({uid:u.uid,username:u.username,email:u.email||'',photo:u.photo||''})); }catch{} };
+  const cacheUser=u=>{ try{ localStorage.setItem(USER_KEY, JSON.stringify({uid:u.uid,username:u.username,email:u.email||'',photo:u.photo||'',premium:!!u.premium})); }catch{} };
   const getCachedUser=()=>{ try{ return JSON.parse(localStorage.getItem(USER_KEY)||'null'); }catch{ return null; } };
 
   /* ---------- shared-link password protection ----------
@@ -760,6 +760,8 @@ const auth = getAuth(app);
           <a class="btn ghost" href="${urlMyBlog()}" style="padding:9px 15px;font-size:13px${active==='blogs'?';border-color:var(--gold);color:var(--txt)':''}">مدونتي</a>
           <a class="btn ghost" href="${urlNewProfile()}" style="padding:9px 15px;font-size:13px">+ بروفايل</a>
           <a class="btn ghost" href="${urlNewBlog()}" style="padding:9px 15px;font-size:13px">+ مدونة</a>
+          <a class="btn ghost ab-vip" href="${pageUrl('premium.html')}" style="padding:9px 14px;font-size:13px${active==='premium'?';border-color:var(--gold);color:var(--txt)':''}">${CROWN}<span>مميز</span></a>
+          ${isAdmin()?`<a class="btn ghost" href="${pageUrl('admin.html')}" style="padding:9px 13px;font-size:13px${active==='admin'?';border-color:var(--gold);color:var(--txt)':''}">الأدمن</a>`:''}
           <button class="btn ghost" data-act="logout" style="padding:9px 13px;font-size:13px">خروج</button>
         </div>
         <a class="user-chip" href="${pageUrl('account.html')}" title="الملف الشخصي">${userAvatar('avatar-sm')}<span class="uc-name">${esc(currentUser.username)}</span></a>
@@ -884,6 +886,8 @@ const auth = getAuth(app);
     document.querySelectorAll('[data-act="mode"]').forEach(b=>{ const s=b.querySelector('span'); b.innerHTML=modeIcon()+(s?('<span>'+s.textContent+'</span>'):''); });
   }
   function wireAppbar(){
+    // reflect premium state on <html> so gated controls can lock for free users
+    document.documentElement.classList.toggle('user-free', !!currentUser && !isPremium());
     // Top-level navigation are now real <a href> links to separate pages (better
     // for SEO + crawlability) — the browser handles them. Here we only wire the
     // in-page controls: theme toggle, logout, and the mobile drawer.
@@ -900,8 +904,10 @@ const auth = getAuth(app);
     if(c==='bad-username') return 'اسم المستخدم يجب أن يكون 3–20 حرفاً (أحرف/أرقام/_)';
     if(c==='username-taken') return 'اسم المستخدم مستخدم بالفعل';
     if(c.includes('email-already-in-use')) return 'هذا البريد مسجّل مسبقاً — سجّل الدخول';
-    if(c.includes('wrong-password')||c.includes('user-not-found')) return 'بيانات الدخول غير صحيحة';
-    if(c.includes('network')) return 'تعذّر الاتصال بالشبكة';
+    if(c.includes('wrong-password')||c.includes('user-not-found')||c==='auth/invalid-credential'||c==='auth/wrong-password'||c==='auth/user-not-found'||c==='auth/invalid-email') return 'بيانات الدخول غير صحيحة';
+    if(c==='auth/operation-not-allowed') return 'فعّل تسجيل الدخول بالبريد/كلمة المرور في Firebase Authentication';
+    if(c==='auth/too-many-requests') return 'محاولات كثيرة — انتظر قليلاً ثم أعد المحاولة';
+    if(c.includes('network')||c==='auth/network-request-failed') return 'تعذّر الاتصال بالشبكة';
     return 'حدث خطأ، حاول مجدداً';
   }
   /* ---------- sign in with Google / GitHub (Firebase Auth) ----------
@@ -940,6 +946,23 @@ const auth = getAuth(app);
   }
   const GOOGLE_SVG='<svg viewBox="0 0 24 24" width="19" height="19"><path fill="#4285F4" d="M23 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.2c-.3 1.4-1.1 2.6-2.3 3.4v2.8h3.7C21.7 18.6 23 15.8 23 12.3Z"/><path fill="#34A853" d="M12 24c3.1 0 5.7-1 7.6-2.8l-3.7-2.8c-1 .7-2.3 1.1-3.9 1.1-3 0-5.5-2-6.4-4.8H1.7v2.9C3.6 21.4 7.5 24 12 24Z"/><path fill="#FBBC05" d="M5.6 14.7c-.2-.7-.4-1.4-.4-2.2s.1-1.5.4-2.2V7.4H1.7C.9 8.9.5 10.4.5 12s.4 3.1 1.2 4.6l3.9-2.9Z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.2.6 4.4 1.7l3.3-3.3C17.7 1.2 15.1 0 12 0 7.5 0 3.6 2.6 1.7 6.4l3.9 3C6.5 6.8 9 4.8 12 4.8Z"/></svg>';
   const GITHUB_SVG='<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.6v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.8-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.5-2.7 5.5-5.3 5.8.4.4.8 1.1.8 2.2v3.3c0 .4.2.7.8.6 4.6-1.5 7.9-5.8 7.9-10.9C23.5 5.7 18.3.5 12 .5Z"/></svg>';
+
+  /* sign in with a Firebase Authentication email/password account (e.g. a user
+     you added directly in the Firebase console — like the admin). Creates a
+     users/<uid> record on first login so the account plugs into the app. */
+  async function firebaseEmailLogin(email, pass){
+    const res = await signInWithEmailAndPassword(auth, email, pass); // throws on wrong credentials
+    const u=res.user, uid=u.uid, em=u.email||email;
+    let rec=await loadUserRecord(uid);
+    if(!rec){
+      rec={ username:(u.displayName || (em.split('@')[0]) || 'مستخدم').slice(0,40), email:em, provider:'password', createdAt:Date.now() };
+      await set(ref(db,'users/'+uid), rec);
+      if(em){ try{ await set(ref(db,'emails/'+encEmail(em)), uid); }catch(e){} }
+    }
+    currentUser={ uid, email:rec.email||em, username:rec.username||'مستخدم', photo:rec.photo||'' };
+    saveSession(uid); cacheUser(currentUser);
+    toast('تم تسجيل الدخول ✓'); route();
+  }
 
   function showAuth(mode='login'){
     document.title='تسجيل الدخول — منشئ البروفايلات';
@@ -1000,11 +1023,18 @@ const auth = getAuth(app);
           toast('تم إنشاء الحساب ✓'); route();
         }else{
           const uid=await emailToUid(email);
-          if(!uid) throw {code:'user-not-found'};
+          if(!uid){
+            // no custom account with this email — try a Firebase Auth account
+            // (email/password users added in Firebase, e.g. the admin)
+            await firebaseEmailLogin(email, pass); return;
+          }
           const rec=await loadUserRecord(uid);
           if(!rec) throw {code:'user-not-found'};
           const h=await hashPass(rec.salt||'',pass);
-          if(h!==rec.passHash) throw {code:'wrong-password'};
+          if(h!==rec.passHash){
+            // password didn't match the custom record — maybe it's a Firebase account
+            try{ await firebaseEmailLogin(email, pass); return; }catch(fb){ throw {code:'wrong-password'}; }
+          }
           currentUser={uid,email:rec.email,username:rec.username,photo:rec.photo||''};
           saveSession(uid); cacheUser(currentUser);
           toast('تم تسجيل الدخول ✓'); route();
@@ -1202,10 +1232,11 @@ const auth = getAuth(app);
         <details class="acc">
           <summary><span class="sum-t">${UICON.grid} التخطيط / الشكل <span style="color:var(--muted-2);font-weight:400">(${LAYOUTS.length})</span></span></summary>
           <div class="acc-body">
+            ${isPremium()?'':gateNote('أول '+FREE_PROFILE_LAYOUTS+' تخطيطاً مجانية — والباقي للمشتركين المميزين.')}
             <input id="laySearch" class="lay-search" placeholder="ابحث عن تخطيط…"/>
             <div class="layouts" id="lays">
-              ${LAYOUTS.map(l=>`<div class="lay ${l.id===state.layout?'active':''}" data-lay="${l.id}" data-name="${esc(l.name)}">
-                ${l.icon}<div class="ln">${esc(l.name)}</div>${l.desc?`<div class="ld">${esc(l.desc)}</div>`:''}</div>`).join('')}
+              ${LAYOUTS.map((l,li)=>{ const lk=li>=FREE_PROFILE_LAYOUTS; return `<div class="lay ${l.id===state.layout?'active':''} ${lk?'locked':''}" data-lay="${l.id}" data-name="${esc(l.name)}" ${lk?'data-locked="1"':''}>
+                ${lk?'<span class="lay-lock">'+LOCKICON+'</span>':''}${l.icon}<div class="ln">${esc(l.name)}</div>${l.desc?`<div class="ld">${esc(l.desc)}</div>`:''}</div>`; }).join('')}
             </div>
           </div>
         </details>
@@ -1497,9 +1528,10 @@ const auth = getAuth(app);
        el.addEventListener('input',()=>{state[k]=el.value;paint();});
      });
 
-    // layout picker
+    // layout picker (locked layouts need a subscription)
     $('#lays').querySelectorAll('.lay').forEach(l=>{
       l.onclick=()=>{
+        if(l.dataset.locked && !isPremium()){ toast('هذا التخطيط للمشتركين المميزين ✦'); return; }
         state.layout=l.dataset.lay;
         $('#lays').querySelectorAll('.lay').forEach(x=>x.classList.toggle('active',x===l));
         paint();
@@ -1530,6 +1562,8 @@ const auth = getAuth(app);
         const ownerName = editing ? editMeta.ownerName : currentUser.username;
         const createdAt = editing ? editMeta.createdAt : Date.now();
         const id = editingId || await uniqueShortId();
+        // free accounts can't save an exclusive (premium) layout
+        if(!isPremium()){ const li=LAYOUTS.findIndex(l=>l.id===state.layout); if(li>=FREE_PROFILE_LAYOUTS) state.layout=(LAYOUTS[0]||{}).id||state.layout; }
         const clean = {...state, ownerUid:owner, ownerName, createdAt, updatedAt:Date.now(), viewSalt:null, viewPassHash:null};
         await set(ref(db,'profiles/'+id), clean);
         await set(ref(db,'userProfiles/'+owner+'/'+id), {name:state.name||'بدون اسم', template:state.template, updatedAt:Date.now()});
@@ -2335,17 +2369,20 @@ const auth = getAuth(app);
         <details class="acc" open>
           <summary><span class="sum-t">${UICON.palette} تصميم المدونة <span style="color:var(--muted-2);font-weight:400">(${BLOG_DESIGNS.length})</span></span></summary>
           <div class="acc-body">
+            ${isPremium()?'':gateNote('أول '+FREE_BLOG_DESIGNS+' تصميماً مجانية — والباقي (حتى 150) للمشتركين المميزين.')}
             <input id="bdSearch" class="lay-search" placeholder="ابحث عن تصميم…"/>
             <div class="bd-picker" id="bdPicker">
-              ${BLOG_DESIGNS.map(d=>`<div class="bd-swatch ${d.id===s.design?'active':''}" data-bd="${d.id}" data-name="${esc(d.name)}">
-                <div class="sw" style="background:linear-gradient(135deg,${d.accent},${d.accent2})"></div><div class="nm">${esc(d.name)}</div></div>`).join('')}
+              ${BLOG_DESIGNS.map(d=>{ const lk=blogDesignLocked(d.id); return `<div class="bd-swatch ${d.id===s.design?'active':''} ${lk?'locked':''}" data-bd="${d.id}" data-name="${esc(d.name)}" ${lk?'data-locked="1"':''}>
+                <div class="sw" style="background:linear-gradient(135deg,${d.accent},${d.accent2})">${lk?'<span class="sw-lock">'+LOCKICON+'</span>':''}</div><div class="nm">${esc(d.name)}</div></div>`; }).join('')}
             </div>
           </div>
         </details>
 
         <details class="acc">
-          <summary><span class="sum-t">${UICON.cube} مؤثرات وعناصر المدونة</span></summary>
+          <summary><span class="sum-t">${UICON.cube} مؤثرات وعناصر المدونة ${isPremium()?'':'<span class="lock-chip">'+LOCKICON+' مميز</span>'}</span></summary>
           <div class="acc-body">
+            ${isPremium()?'':gateNote('المؤثرات المتقدمة (3D، أنيميشن، مربع البحث، القائمة الجانبية، شريط الأخبار) متاحة للمشتركين فقط.')}
+            <div class="${isPremium()?'':'is-locked'}">
             <div class="opt-row">
               <div><div class="lbl">مؤثر ثلاثي الأبعاد (3D)</div><div class="desc">تميل بطاقات المقالات مع حركة المؤشر</div></div>
               <label class="switch"><input type="checkbox" id="f-b-threeD" ${s.threeD?'checked':''}><span class="slider"></span></label>
@@ -2365,6 +2402,7 @@ const auth = getAuth(app);
             <div class="opt-row">
               <div><div class="lbl">شريط آخر الأخبار</div><div class="desc">شريط بأحدث عناوين مقالاتك أعلى المدونة</div></div>
               <select id="f-b-tickerStyle" class="mini-select">${BLOG_TICKER.map(a=>`<option value="${a.id}" ${a.id===bTickerStyle(s)?'selected':''}>${a.name}</option>`).join('')}</select>
+            </div>
             </div>
           </div>
         </details>
@@ -2441,8 +2479,9 @@ const auth = getAuth(app);
       el.addEventListener('input',()=>{ blogState[k]=el.value; repaint(); });
     });
 
-    // design picker
+    // design picker (locked designs need a subscription)
     $('#bdPicker').querySelectorAll('.bd-swatch').forEach(sw=>sw.onclick=()=>{
+      if(sw.dataset.locked && !isPremium()){ toast('هذا التصميم للمشتركين المميزين ✦'); return; }
       blogState.design=sw.dataset.bd;
       $('#bdPicker').querySelectorAll('.bd-swatch').forEach(x=>x.classList.toggle('active',x===sw));
       repaint();
@@ -2604,6 +2643,11 @@ const auth = getAuth(app);
         const ownerName = editing ? blogEditMeta.ownerName : currentUser.username;
         const createdAt = editing ? blogEditMeta.createdAt : Date.now();
         const id = blogEditingId || await uniqueBlogId();
+        // free accounts can't save premium features (advanced elements + exclusive designs)
+        if(!isPremium()){
+          blogState.threeD=false; blogState.anim='none'; blogState.searchStyle='off'; blogState.sidebarStyle='none'; blogState.tickerStyle='none';
+          if(blogDesignLocked(blogState.design)) blogState.design='bd1';
+        }
         const cleanPosts = blogState.posts.filter(p=>p&&(p.title||p.body)).map(p=>({...p, published:p.published!==false}));
         const pubCount = cleanPosts.filter(p=>p.published!==false).length;
         const updatedAt=Date.now();
@@ -2762,7 +2806,14 @@ const auth = getAuth(app);
   const isAdmin = () => !!(currentUser && adminEmail && (currentUser.email||'').trim().toLowerCase()===adminEmail);
   async function getPremium(uid){ try{ const s=await get(child(ref(db),'premium/'+uid)); return s.exists()?s.val():null; }catch(e){ return null; } }
   const premiumActive = p => !!(p && p.active && (!p.expires || p.expires>Date.now()));
+  const isPremium = () => !!(currentUser && currentUser.premium);
   const fmtDay = ts => { try{ return new Date(ts).toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}); }catch{ return ''; } };
+  /* ---- premium gating: which features require a subscription ---- */
+  const FREE_BLOG_DESIGNS = 50;      // first 50 blog designs are free
+  const FREE_PROFILE_LAYOUTS = 50;   // first 50 profile layouts are free
+  const blogDesignLocked = id => { const n=parseInt(String(id).replace(/\D/g,''),10)||0; return n>FREE_BLOG_DESIGNS; };
+  const gateNote = (txt)=>`<div class="gate-note">${LOCKICON}<span>${txt}</span><a href="${pageUrl('premium.html')}">ترقية للاشتراك المميز ✦</a></div>`;
+  const LOCKICON='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
 
   async function showPremium(){
     if(!currentUser){ gotoLogin(); return; }
@@ -2925,7 +2976,9 @@ const auth = getAuth(app);
     const uid=getSession();
     if(!uid){ route(); return; }
     loadAdminEmail();                                  // background: enables the admin nav for the admin
-    const applyPrem=()=>getPremium(uid).then(pp=>{ if(currentUser) currentUser.premium=premiumActive(pp); }).catch(()=>{});
+    // refresh premium status in the background & cache it for the NEXT navigation only —
+    // we never flip the gate mid-view, so the current page stays fully consistent.
+    const applyPrem=()=>getPremium(uid).then(pp=>{ try{ const c=getCachedUser()||{}; c.premium=premiumActive(pp); localStorage.setItem(USER_KEY, JSON.stringify(c)); }catch(e){} }).catch(()=>{});
     const cached=getCachedUser();
     if(cached && cached.uid===uid){
       // instant render from cache; refresh the record quietly in the background
