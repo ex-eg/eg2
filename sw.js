@@ -3,8 +3,8 @@
    then refreshes the cache in the background. This prevents the long "hang" that
    network-first caused when the network stalled. Firebase / cross-origin traffic
    is never intercepted, so live data always comes fresh from the database. */
-const CACHE = 'elgoharyx-v10';
-const CORE = ['/', '/index.html', '/assets/styles.css', '/assets/app.js', '/assets/fx.js', '/assets/pwa.js', '/assets/ads.js', '/explore.html'];
+const CACHE = 'elgoharyx-v12';
+const CORE = ['./', './index.html', './assets/styles.css', './assets/app.js', './assets/fx.js', './assets/pwa.js', './assets/ads.js', './explore.html'];
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -33,6 +33,6 @@ self.addEventListener('fetch', e => {
       return res;
     }).catch(() => null);
     // cached first (instant); otherwise wait for network; final fallback = home page
-    return cached || (await netFetch) || caches.match('/index.html');
+    return cached || (await netFetch) || caches.match('./index.html');
   })());
 });
