@@ -635,7 +635,7 @@
   .l-spotlight .pf-spot .pf-actions{justify-content:center}
 
   /* layout picker */
-  .layouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin:6px 0 20px}
+  .layouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px;margin:6px 0 20px;overflow-y:auto}
   .lay{cursor:pointer;border:1px solid var(--stroke);border-radius:10px;padding:9px 8px 8px;
     background:rgba(255,255,255,.02);transition:.2s;text-align:center}
   .lay:hover{border-color:rgba(201,165,72,.5)}
@@ -1830,8 +1830,9 @@
     h2{letter-spacing:-.2px}
     .mp-grid{gap:14px}
     .badm-hero{border-radius:18px}
-    /* smoother momentum scroll for horizontal pickers */
-    .bd-picker,.templates,.layouts{-webkit-overflow-scrolling:touch}
+    /* smoother momentum scroll for the pickers, and keep the touch gesture inside
+       the list so the scrolling parent panel/page never "steals" it (was: rigid lists) */
+    .bd-picker,.templates,.layouts,.notif-list{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
   }
   /* =====================================================================
      PREMIUM / PAYMENTS + ADMIN
@@ -2325,9 +2326,9 @@
   .ac-item .ac-tx{color:var(--muted);font-size:14px;line-height:1.8;white-space:pre-wrap;word-break:break-word}
 
   /* ============ زر تغيير اللغة ============ */
-  .lang-toggle{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-family:"Space Grotesk",sans-serif;
-    font-size:13px;font-weight:600;color:var(--muted);background:color-mix(in srgb,var(--txt) 4%,transparent);
-    border:1px solid var(--stroke);border-radius:100px;padding:8px 14px;transition:.18s;line-height:1}
-  .lang-toggle:hover{color:var(--txt);border-color:var(--gold-2)}
-  .lang-toggle svg{width:17px;height:17px}
-  html[dir="ltr"] .lang-toggle .lt-label,html[dir="ltr"] body{letter-spacing:0}
+  .lang-toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-family:"Space Grotesk",sans-serif;
+    font-size:12px;font-weight:700;color:var(--muted);background:color-mix(in srgb,var(--txt) 4%,transparent);
+    border:1px solid var(--stroke);border-radius:100px;padding:7px 11px;transition:.18s;line-height:1}
+  .lang-toggle:hover{color:var(--gold-2);border-color:var(--gold-2)}
+  .lang-toggle svg{width:18px;height:18px}
+  .lang-toggle .lt-label{min-width:15px;text-align:center;letter-spacing:.5px}
