@@ -1697,9 +1697,10 @@ const auth = getAuth(app);
       const paintProfile=()=>{
         seoFor(d);
         document.body.style.background = PAGE_BG[d.template]||'#0c1424';
-        $('#app').innerHTML = `<div class="viewer">${renderCard(d)}</div>`;
+        $('#app').innerHTML = `<div class="viewer">${renderCard(d)}<div class="elg-ad" data-ad="profile"></div></div>`;
         wireCopy($('#app')); wire3D($('#app'));
         if(d.anim && d.anim!=='none'){ const pf=$('#app .pf'); if(pf) pf.classList.add('anim-'+d.anim); }
+        if(window.elgFillAds) window.elgFillAds($('#app'));
       };
       if(isLocked(d)){ showPassGate('p', id, d, paintProfile); return; }
       paintProfile();
@@ -2161,7 +2162,8 @@ const auth = getAuth(app);
         <div class="bf-copy">© 2026 <b>${esc(d.title||'')}</b> — بُنيت عبر <a href="${urlHome()}">elgoharyX</a></div>
       </div></footer>`;
     const hasSide = bSidebarStyle(d)!=='none';
-    const main = `${blogSearchBox(d)}${feat}${grid}${about}`;
+    const adSlot = `<div class="elg-ad" data-ad="article"></div>`;
+    const main = `${blogSearchBox(d)}${feat}${adSlot}${grid}${about}`;
     const layout = hasSide
       ? `<div class="blog-layout"><div class="blog-main">${main}</div>${blogSidebar(d,posts)}</div>`
       : main;
@@ -2171,6 +2173,7 @@ const auth = getAuth(app);
       ${foot}</div>`;
     wireBlogIndex(id,d);
     if(d.ownerUid) getPremium(d.ownerUid).then(pp=>{ if(premiumActive(pp)){ const b=$('#app .blog'); if(b) b.classList.add('owner-premium'); } });
+    if(window.elgFillAds) window.elgFillAds($('#app'));
     window.scrollTo(0,0);
   }
   function renderArticle(id,d,idx){
@@ -2192,10 +2195,12 @@ const auth = getAuth(app);
           <span class="dot"></span><span>${blogReadTime(p.body)}</span></div>
         ${p.cover?`<div class="art-cover"><img src="${esc(p.cover)}" alt="${esc(p.title)}" onerror="this.closest('.art-cover').remove()"/></div>`:''}
         <div class="art-body dropcap">${renderPostBody(p.body)||'<p>لا يوجد محتوى.</p>'}</div>
+        <div class="elg-ad" data-ad="article"></div>
         ${more}
       </div></div>`;
     $('#app').querySelector('.art-back').onclick=()=>renderBlogIndex(id,d);
     $('#app').querySelectorAll('[data-post]').forEach(el=>el.onclick=()=>renderArticle(id,d,+el.dataset.post));
+    if(window.elgFillAds) window.elgFillAds($('#app'));
     window.scrollTo(0,0);
   }
 
@@ -2811,6 +2816,7 @@ const auth = getAuth(app);
       </div></section>
       <div class="wrap">
         <div class="xp-count" id="xpCount"></div>
+        <div class="elg-ad" data-ad="infeed"></div>
         <div id="xpList">${skelGrid(6)}</div>
       </div>` + (currentUser?drawer('explore'):'');
     wireAppbar();
@@ -2827,6 +2833,7 @@ const auth = getAuth(app);
           : `<div class="xp-empty">${list.length?'لا توجد نتائج مطابقة لبحثك.':'لا توجد مدونات منشورة بعد — كن أول من ينشر مدونته!'}</div>`;
       };
       draw(list);
+      if(window.elgFillAds) window.elgFillAds($('#app'));
       const sb=$('#xpSearch'); if(sb) sb.oninput=()=>{ const q=sb.value.trim().toLowerCase();
         draw(!q?list:list.filter(b=>((b.title||'')+' '+(b.author||'')+' '+(b.subtitle||'')).toLowerCase().includes(q))); };
     }catch(e){
@@ -2864,6 +2871,10 @@ const auth = getAuth(app);
   }
   const CROWN='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 8.5 6.5 12l3.7-6 1.8 0L15.5 12l4-3.5-1.7 10.5H4.2L2.5 8.5Zm3.2 10.5h12.6"/></svg>';
   const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="26" height="26"><path d="M20 6 9 17l-5-5"/></svg>';
+  /* أيقونات مزايا الاشتراك المميز */
+  const AD_OFF_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 4 16 16"/></svg>';
+  const PK_LINK_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>';
+  const PK_STAR_IC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.6 6 .8-4.4 4.2 1.1 6L12 17l-5.3 2.6 1.1-6L3.4 9.4l6-.8L12 3Z"/></svg>';
 
   /* ======================================================================
      NOTIFICATIONS — site announcements (bell), subscribe, + email delivery
@@ -3047,8 +3058,18 @@ const auth = getAuth(app);
     $('#app').innerHTML = appbar('premium') + `<div class="wrap pm-wrap">
       <div class="pm-hero"><span class="pm-crown">${CROWN}</span>
         <h1>الاشتراك المميز</h1>
-        <p>ادعم elgoharyX واحصل على شارة «عضو مميز»، وإزالة علامة elgoharyX من روابطك، ومزايا حصرية قادمة.</p></div>
+        <p>استمتع بتجربة <b>بلا إعلانات نهائيًا</b> على كامل الموقع، واحصل على شارة «عضو مميز»، وإزالة علامة elgoharyX من روابطك، ومزايا حصرية قادمة.</p></div>
       ${statusHtml}
+      <div class="pm-perks">
+        <div class="pm-perk feature"><span class="pm-pk-ic">${AD_OFF_IC}</span>
+          <div><b>بلا إعلانات نهائيًا</b><span>تصفّح الموقع كله — المدونات والبروفايلات — دون أي إعلان يقاطعك.</span></div></div>
+        <div class="pm-perk"><span class="pm-pk-ic">${CROWN}</span>
+          <div><b>شارة «عضو مميز»</b><span>تظهر على بروفايلك ومدونتك وتُميّزك عن غيرك.</span></div></div>
+        <div class="pm-perk"><span class="pm-pk-ic">${PK_LINK_IC}</span>
+          <div><b>روابط نظيفة باسمك</b><span>إزالة علامة elgoharyX من روابطك المشاركة.</span></div></div>
+        <div class="pm-perk"><span class="pm-pk-ic">${PK_STAR_IC}</span>
+          <div><b>دعم الموقع + مزايا قادمة</b><span>أنت تدعم استمرار elgoharyX وتحصل على كل جديد أولًا.</span></div></div>
+      </div>
       <div class="pm-price"><b>${price}</b><span>جنيه · لمدة 3 شهور</span>
         <div class="pm-note2">${price===PREMIUM.renew?'سعر التجديد':'سعر أول اشتراك'} — التجديد بعدها ${PREMIUM.renew} ج</div></div>
       <div class="pm-card">

@@ -1852,6 +1852,20 @@
   .pm-status{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--stroke);border-radius:12px;
     padding:13px 16px;margin:16px 0;font-size:13.5px;color:var(--muted)}
   .pm-status.ok{border-color:rgba(201,165,72,.5);background:color-mix(in srgb,var(--gold) 8%,transparent);color:var(--txt)}
+  /* مزايا الاشتراك المميز */
+  .pm-perks{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}
+  .pm-perk{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--stroke);border-radius:14px;
+    padding:15px 16px;background:rgba(255,255,255,.02)}
+  .pm-perk .pm-pk-ic{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:var(--gold-2);
+    background:color-mix(in srgb,var(--gold) 12%,transparent);border:1px solid var(--stroke)}
+  .pm-perk .pm-pk-ic svg{width:22px;height:22px}
+  .pm-perk .pm-pk-ic svg[fill="currentColor"]{fill:currentColor}
+  .pm-perk b{display:block;font-family:"Space Grotesk",sans-serif;font-size:14.5px;color:var(--txt);margin-bottom:3px}
+  .pm-perk span{color:var(--muted);font-size:12.8px;line-height:1.7}
+  .pm-perk.feature{border-color:rgba(201,165,72,.5);
+    background:radial-gradient(400px 160px at 85% -30%,rgba(201,165,72,.16),transparent 60%),rgba(255,255,255,.02)}
+  .pm-perk.feature .pm-pk-ic{color:#1a1300;background:linear-gradient(135deg,var(--gold),var(--gold-2));border-color:transparent}
+  @media(max-width:560px){ .pm-perks{grid-template-columns:1fr} }
   .pm-price{text-align:center;border:1px solid var(--stroke);border-radius:16px;padding:22px;margin:16px 0;
     background:radial-gradient(500px 200px at 80% -40%,rgba(201,165,72,.15),transparent 60%),linear-gradient(180deg,var(--panel),var(--bg-2))}
   .pm-price b{font-family:"Space Grotesk";font-size:48px;color:var(--gold-2);line-height:1}
@@ -2153,3 +2167,17 @@
     .adm-uacts,.adm-cacts{justify-content:flex-start}
     .adm-citem{flex-wrap:wrap}
   }
+
+  /* ===== إعلانات AdSense (.elg-ad) ===== */
+  .elg-ad{max-width:900px;margin:26px auto;padding:0 16px;text-align:center;clear:both}
+  .elg-ad:not([data-done]){display:none}          /* مخفي قبل تحميل الإعلان — لا فراغات */
+  .elg-ad .elg-ad-lbl{display:block;font-family:"Space Grotesk",sans-serif;font-size:10.5px;
+    letter-spacing:1.5px;text-transform:uppercase;color:var(--muted-2,#8892a6);margin-bottom:6px}
+  .elg-ad ins{display:block;min-height:0}
+  .elg-ad ins[data-ad-status="unfilled"]{display:none!important}      /* لا يوجد إعلان الآن */
+  .elg-ad:has(ins[data-ad-status="unfilled"]) .elg-ad-lbl{display:none}
+  /* داخل المقالة: هامش أنسب */
+  .article-view .elg-ad{margin:34px auto}
+  /* أخفِ قسم الإعلان في الصفحة الرئيسية تمامًا ما لم يظهر إعلان فعلي (لا فراغات) */
+  .elg-ad-sec:has(.elg-ad:not([data-done])){display:none}
+  .elg-ad-sec:has(ins[data-ad-status="unfilled"]){display:none}
