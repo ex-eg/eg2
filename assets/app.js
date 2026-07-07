@@ -1,198 +1,25 @@
-/* elgoharyX — Firebase initialization.
-   Single source of truth for the database connection. Every module that needs
-   the DB imports `db` and the helpers from here instead of re-initializing. */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app-check.js";
-import { getDatabase, ref, set, get, child, remove, update, increment } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
-import { getAuth, GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDynVoQRSD9icEcXfEz8Fdjms-sNd9gz9Y",
-  authDomain: "xogame-a4254.firebaseapp.com",
-  databaseURL: "https://xogame-a4254-default-rtdb.firebaseio.com",
-  projectId: "xogame-a4254",
-  storageBucket: "xogame-a4254.firebasestorage.app",
-  messagingSenderId: "961834791643",
-  appId: "1:961834791643:web:4916dd3cd8fa577d2f92fe",
-  measurementId: "G-SESYRWKR5J"
-};
-
-const app = initializeApp(firebaseConfig);
-
-/* App Check — attests that requests come from the real elgoharyX site (registered
-   with this reCAPTCHA v3 key, restricted to ex-eg.github.io). Once App Check is set
-   to "Enforce" for Realtime Database, requests without a valid token are rejected.
-   For local testing (localhost), set a debug token — see note in the docs. */
-try {
-  // Optional: enable an App Check debug token on localhost so local dev keeps working.
-  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-  }
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider('6LdjuUUtAAAAAG9D85LTSaK0HM5UoIrzgHnHB5DG'),
-    isTokenAutoRefreshEnabled: true
-  });
-} catch (e) { console.warn('App Check init skipped:', e); }
-
-const db = getDatabase(app);
-const auth = getAuth(app);
-
-  /* ---------- multi-page site links ----------
-     Every section lives in its own HTML file in the same folder. ROOT is that
-     folder's URL, and the helpers below build canonical cross-page links. */
-  const ROOT = location.origin + location.pathname.replace(/[^/]*$/, '');
-  const PAGE = (document.body && document.body.dataset.page) || '';
-  /* ---------- i18n: bilingual helper (Arabic default / English) ----------
-     t('عربي','English') returns the string in the active language. Language is
-     resolved from i18n.js if present, else localStorage, else the device language. */
-  function curLang(){
-    try{
-      if(window.elgGetLang) return window.elgGetLang();
-      var s=localStorage.getItem('apb_lang'); if(s==='en'||s==='ar') return s;
-      var l=((navigator.languages&&navigator.languages[0])||navigator.language||'').toLowerCase();
-      return l.indexOf('ar')===0?'ar':'en';
-    }catch(e){ return 'ar'; }
-  }
-  const t = (ar, en) => (en != null && curLang() === 'en') ? en : ar;
-  const pageUrl = (file, qs) => ROOT + file + (qs ? ('?' + qs) : '');
-  const urlHome        = ()  => ROOT;
-  const urlExplore     = ()  => pageUrl('explore.html');
-  const urlLogin       = ()  => pageUrl('login.html');
-  const urlMyProfiles  = ()  => pageUrl('my-profiles.html');
-  const urlMyBlog      = ()  => pageUrl('my-blog.html');
-  const urlNewProfile  = ()  => pageUrl('create-profile.html');
-  const urlNewBlog     = ()  => pageUrl('create-blog.html');
-  const urlProfileView = id  => pageUrl('profile.html', 'id=' + id);
-  const urlProfileEdit = id  => pageUrl('create-profile.html', 'edit=' + id);
-  const urlBlogView    = id  => pageUrl('blog.html', 'blog=' + id);
-  const urlBlogEdit    = id  => pageUrl('create-blog.html', 'blogedit=' + id);
-  /* send a logged-out visitor to the login page, remembering where to return. */
-  const gotoLogin = () => { location.href = urlLogin() + '?next=' + encodeURIComponent(location.href); };
-
-  /* ---------- helpers ---------- */
-  const LOGO='https://i.ibb.co/1t1TCvH7/103777.png';
-  const SUN='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>';
-  const MOON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>';
-  /* iOS-style line icons (replace emoji) */
-  const UICON = {
-    person:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.6 3.6-6 8-6s8 2.4 8 6"/></svg>',
-    palette:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1 0 1.6-.8 1.6-1.7 0-.5-.2-.9-.5-1.2-.3-.4-.5-.8-.5-1.2 0-.9.8-1.6 1.7-1.6H16a5 5 0 0 0 5-5c0-3.9-4-7.3-9-7.3Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16.5" cy="11" r="1"/></svg>',
-    photo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M21 16l-5-5-9 9"/></svg>',
-    chat:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.5 7.2L3 21l1.8-6.5A8 8 0 1 1 21 12Z"/></svg>',
-    scope:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="2.4"/></svg>',
-    check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
-    bulb:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.6 1 1 1 2h6c0-1 .3-1.4 1-2A6 6 0 0 0 12 3Z"/></svg>',
-    play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
-    grid:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
-    cube:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>',
-    wand:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 16 8M14 6l4 4M18 3l.6 1.6L20.2 5.2l-1.6.6L18 7.4l-.6-1.6L15.8 5.2l1.6-.6Z"/></svg>',
-  };
-  const TAB = {
-    cards:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/></svg>',
-    plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
-    logout:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
-    burger:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
-    x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
-    mode:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>',
-    howto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.4 2.4 0 1 1 3.4 2.2c-.8.4-1.1.9-1.1 1.8"/><path d="M12 16.4h.01"/></svg>',
-    privacy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.1-7 10-4-1.9-7-5.5-7-10V6l7-3Z"/><path d="M9.3 12l1.9 1.9L15 10.2"/></svg>',
-    support:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><path d="M5.2 5.2 8.4 8.4M15.6 15.6l3.2 3.2M18.8 5.2 15.6 8.4M8.4 15.6 5.2 18.8"/></svg>',
-  };
-  try{ if(localStorage.getItem('apb_mode')==='light') document.documentElement.setAttribute('data-mode','light'); }catch{}
-  const $ = (s,r=document)=>r.querySelector(s);
-  const esc = s => String(s??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const toast = (m=t('تم النسخ ✓','Copied ✓'))=>{const t=$('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1900);};
-  const initials = n => (n||t('؟','?')).trim().replace(/^(Prof\.|Dr\.|أ\.د\.|د\.)\s*/i,'').charAt(0).toUpperCase();
-
-  /* update SEO meta tags dynamically (per profile / per view) */
-  function setMeta(sel, attr, val){
-    let el=document.head.querySelector(sel);
-    if(!el){ el=document.createElement('meta'); const m=sel.match(/\[(name|property)="([^"]+)"\]/); if(m) el.setAttribute(m[1],m[2]); document.head.appendChild(el); }
-    el.setAttribute(attr, val);
-  }
-  function seoFor(d){
-    const title=(d.name||t('بروفايل','Profile'))+' — '+(d.role?d.role.slice(0,60):t('ملف أكاديمي','Academic profile'))+' | elgoharyX';
-    const desc=(d.about||d.role||t('الملف الأكاديمي الشخصي','Personal academic profile')).slice(0,155);
-    const img=d.photo||LOGO;
-    document.title=title;
-    setMeta('meta[name="description"]','content',desc);
-    setMeta('meta[property="og:title"]','content',title);
-    setMeta('meta[property="og:description"]','content',desc);
-    setMeta('meta[property="og:image"]','content',img);
-    setMeta('meta[name="twitter:title"]','content',title);
-    setMeta('meta[name="twitter:description"]','content',desc);
-    setMeta('meta[name="twitter:image"]','content',img);
-  }
-
-  /* shared error screen (bad link, missing profile, unexpected failure) */
-  function renderError(o){
-    o=o||{};
-    try{ document.body.style.background=''; }catch(e){}
-    document.title=(o.code||t('خطأ','Error'))+' — elgoharyX';
-    const app=document.getElementById('app'); if(!app) return;
-    app.innerHTML=`
-      <div class="err-wrap"><div class="err-card">
-        <img class="err-logo" src="${LOGO}" alt="elgoharyX"/>
-        <div class="err-code">${esc(o.code||'404')}</div>
-        <span class="err-tag"><i></i>${esc(o.tag||t('رابط غير صالح · BROKEN LINK','Broken link · BROKEN LINK'))}</span>
-        <h2 class="err-title">${esc(o.title||t('الصفحة غير موجودة','Page not found'))}</h2>
-        <p class="err-msg">${esc(o.msg||t('يبدو أن الرابط غير صحيح أو تم تعديله أو أن المحتوى لم يعد متاحاً.','The link may be incorrect, was changed, or the content is no longer available.'))}</p>
-        <div class="err-actions">
-          <a class="btn primary" href="${urlHome()}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="18" height="18"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 21v-6h6v6"/></svg>
-            ${t('العودة للرئيسية','Back to home')}</a>
-          ${o.showReload?`<button class="btn ghost" onclick="location.reload()">${t('إعادة المحاولة','Try again')}</button>`:''}
-        </div>
-      </div></div>`;
-  }
-  let _fatalShown=false;
-  function fatalError(){
-    if(_fatalShown) return; _fatalShown=true;
-    renderError({code:t('خطأ','Error'),tag:t('خطأ غير متوقّع · UNEXPECTED','Unexpected error · UNEXPECTED'),title:t('حدث خطأ ما','Something went wrong'),
-      msg:t('واجهنا مشكلة غير متوقّعة أثناء تشغيل الصفحة. جرّب إعادة التحميل، وإن استمرّت المشكلة عُد إلى الرئيسية.','We ran into an unexpected problem while loading the page. Try reloading, and if the problem persists return to home.'),showReload:true});
-  }
-  // only real uncaught script errors trigger the boundary (ignore resource/load errors)
-  window.addEventListener('error', e=>{ if(e && e.error instanceof Error) fatalError(); });
-
-  /* short unique id (7 chars, no ambiguous letters) */
-  const ALPH='23456789abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
-  function shortId(n=7){const a=crypto.getRandomValues(new Uint32Array(n));let s='';for(let i=0;i<n;i++)s+=ALPH[a[i]%ALPH.length];return s;}
-  async function uniqueShortId(){
-    for(let k=0;k<6;k++){const id=shortId(7);const snap=await get(child(ref(db),'profiles/'+id));if(!snap.exists())return id;}
-    return shortId(10);
-  }
-  async function uniqueUserId(){
-    for(let k=0;k<6;k++){const id=shortId(9);const snap=await get(child(ref(db),'users/'+id));if(!snap.exists())return id;}
-    return shortId(12);
-  }
-  /* auto URL shortener — tries multiple providers so it (almost) always works.
-     Works only for public http/https links (i.e. after the site is hosted). */
-  async function shorten(url){
-    if(!/^https?:/i.test(url)) return null;
-    const providers = [
-      'https://is.gd/create.php?format=simple&url=',
-      'https://tinyurl.com/api-create.php?url=',
-      'https://v.gd/create.php?format=simple&url=',
-    ];
-    for(const p of providers){
-      try{
-        const r=await fetch(p+encodeURIComponent(url));
-        if(!r.ok) continue;
-        const t=(await r.text()).trim();
-        if(/^https?:\/\//i.test(t) && !/error/i.test(t)) return t;
-      }catch{ /* try next provider */ }
-    }
-    return null;
-  }
-  /* upload an image file to imgbb and return its hosted URL */
-  const IMGBB_KEY='926c4a15635bfbd9038815bcbc0184ad';
-  async function uploadToImgbb(file){
-    const fd=new FormData(); fd.append('image', file);
-    const r=await fetch('https://api.imgbb.com/1/upload?key='+IMGBB_KEY,{method:'POST',body:fd});
-    const j=await r.json();
-    if(!j||!j.success||!j.data) throw new Error('imgbb upload failed');
-    return j.data.url || j.data.display_url;
-  }
+/* elgoharyX — main application module.
+   Firebase, shared helpers and image hosting now live in their own modules:
+     firebase.js  → DB/Auth init + re-exported Realtime-DB/Auth helpers
+     core.js      → i18n, links, DOM/escape/toast helpers, SEO, error screen, ids
+     imagehost.js → imgbb upload (multi-key, admin-managed)
+   Everything imported below comes from them, so this file holds only the app's
+   screens, router and logic. */
+import {
+  db, auth, ref, set, get, child, remove, update, increment,
+  GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut,
+  captchaKeys, dbState, saveDbBackups, setActiveDb
+} from './firebase.js';
+import {
+  ROOT, PAGE, curLang, t, pageUrl,
+  urlHome, urlExplore, urlLogin, urlMyProfiles, urlMyBlog, urlHub, urlNewProfile, urlNewBlog,
+  urlProfileView, urlProfileEdit, urlBlogView, urlBlogEdit, gotoLogin,
+  LOGO, SUN, MOON, UICON, TAB,
+  $, esc, toast, initials, setMeta, seoFor, renderError, fatalError,
+  shortId, uniqueShortId, uniqueUserId, shorten
+} from './core.js';
+import { uploadToImgbb, loadImageKeys, saveImageKeys, clearImageKeysCache, currentImageKeys } from './imagehost.js';
+import { logVisit, startPresence, captureReferral, recordReferralIfPending, referralCount } from './site.js';
 
   const TEMPLATES = [
     {id:'royal',    name:t('الكلاسيكي','Classic')},
@@ -772,6 +599,7 @@ const auth = getAuth(app);
     const right = currentUser ? `
         <button class="btn ghost ab-only" data-act="mode" title="${t('الوضع','Theme')}" style="padding:9px 12px">${modeIcon()}</button>
         <div class="ab-nav">
+          <a class="btn ghost" href="${urlHub()}" style="padding:9px 15px;font-size:13px${active==='hub'?';border-color:var(--gold);color:var(--txt)':''}">${t('لوحتي','My Hub')}</a>
           <a class="btn ghost" href="${urlExplore()}" style="padding:9px 15px;font-size:13px${active==='explore'?';border-color:var(--gold);color:var(--txt)':''}">${t('استكشف','Explore')}</a>
           <a class="btn ghost" href="${urlMyProfiles()}" style="padding:9px 15px;font-size:13px${active==='mine'?';border-color:var(--gold);color:var(--txt)':''}">${t('بروفايلاتي','My Profiles')}</a>
           <a class="btn ghost" href="${urlMyBlog()}" style="padding:9px 15px;font-size:13px${active==='blogs'?';border-color:var(--gold);color:var(--txt)':''}">${t('مدونتي','My Blog')}</a>
@@ -811,8 +639,10 @@ const auth = getAuth(app);
           <div class="dr-id"><div class="dr-name">${esc(currentUser.username)}</div><div class="dr-sub">${esc(currentUser.email||t('حساب elgoharyX','elgoharyX account'))}</div></div>
         </a>
         <nav class="drawer-nav">
+          <a class="dr-item ${active==='hub'?'on':''}" href="${urlHub()}">${UICON.grid}<span>${t('لوحتي — كل بروفايلاتي ومدوناتي','My Hub — all my profiles & blogs')}</span></a>
           <a class="dr-item ${active==='account'?'on':''}" href="${pageUrl('account.html')}">${UICON.person}<span>${t('الملف الشخصي','Profile')}</span></a>
           <a class="dr-item dr-vip ${active==='premium'?'on':''}" href="${pageUrl('premium.html')}">${CROWN}<span>${t('الاشتراك المميز','Premium')}</span></a>
+          <button class="dr-item" data-act="invite"><span style="font-size:18px">🎁</span><span>${t('ادعُ أصدقاءك — بريميوم مجاني','Invite friends — free Premium')}</span></button>
           ${isAdmin()?`<a class="dr-item ${active==='admin'?'on':''}" href="${pageUrl('admin.html')}">${TAB.privacy}<span>${t('لوحة الأدمن','Admin')}</span></a>`:''}
           <a class="dr-item ${active==='explore'?'on':''}" href="${urlExplore()}">${TAB.cards}<span>${t('استكشف المدونات','Explore Blogs')}</span></a>
           <a class="dr-item ${active==='mine'?'on':''}" href="${urlMyProfiles()}">${TAB.cards}<span>${t('بروفايلاتي','My Profiles')}</span></a>
@@ -918,6 +748,8 @@ const auth = getAuth(app);
     document.querySelectorAll('[data-act="menu-close"]').forEach(b=>b.onclick=()=>{ if(dw) dw.classList.remove('open'); });
     // notifications bell (announcements + subscribe)
     document.querySelectorAll('[data-act="bell"]').forEach(b=>b.onclick=openNotifications);
+    // referral invite popup (share link → 1-day premium)
+    document.querySelectorAll('[data-act="invite"]').forEach(b=>b.onclick=()=>{ const dw=$('#drawerWrap'); if(dw) dw.classList.remove('open'); openReferral(false); });
     // language toggle (Arabic / English) — flips language then re-renders the page
     document.querySelectorAll('[data-act="lang"]').forEach(b=>{
       const lbl=b.querySelector('.lt-label'); if(lbl) lbl.textContent = curLang()==='en'?'ع':'EN';
@@ -1090,6 +922,7 @@ const auth = getAuth(app);
     share:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5 15.4 17.5M15.4 6.5 8.6 10.5"/></svg>',
     link:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>',
     up:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v13"/></svg>',
+    qr:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 14v.01M14 20v.01M20 20v.01M17 17v.01M20 17h.01M17 20h.01"/></svg>',
   };
 
   /* ---------- account / profile page (edit account + avatar) ---------- */
@@ -1207,6 +1040,7 @@ const auth = getAuth(app);
               <button data-edit="${p.id}">${IC2.pen} ${t('تعديل','Edit')}</button>
               <button data-share="${p.id}">${IC2.share} ${t('مشاركة للتعديل','Share for editing')}</button>
               <button data-link="${p.id}">${IC2.link} ${t('الرابط','Link')}</button>
+              <button data-qr="${p.id}" data-qrname="${esc(p.name||'')}">${IC2.qr} ${t('رمز QR','QR code')}</button>
               <button class="del" data-del="${p.id}">${t('حذف','Delete')}</button>
             </div>
           </div>
@@ -1214,6 +1048,7 @@ const auth = getAuth(app);
       $('#mpList').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>startEdit(b.dataset.edit));
       $('#mpList').querySelectorAll('[data-link]').forEach(b=>b.onclick=()=>{navigator.clipboard?.writeText(urlProfileView(b.dataset.link));toast(t('تم نسخ رابط العرض ✓','View link copied ✓'));});
       $('#mpList').querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>{navigator.clipboard?.writeText(urlProfileEdit(b.dataset.share));toast(t('تم نسخ رابط التعديل ✓ — شاركه لمن يعدّل البروفايل','Edit link copied ✓ — share it with your co-editor'));});
+      $('#mpList').querySelectorAll('[data-qr]').forEach(b=>b.onclick=()=>openQR(urlProfileView(b.dataset.qr), b.dataset.qrname||t('بروفايل','Profile')));
       $('#mpList').querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
         if(!confirm(t('حذف هذا البروفايل نهائياً؟','Permanently delete this profile?'))) return;
         try{ await remove(ref(db,'profiles/'+b.dataset.del)); await remove(ref(db,'userProfiles/'+currentUser.uid+'/'+b.dataset.del)); toast(t('تم الحذف','Deleted')); showMyProfiles(); }
@@ -1222,6 +1057,155 @@ const auth = getAuth(app);
     }catch(e){
       console.error(e);
       $('#mpList').innerHTML=`<div class="mp-empty">${t('تعذّر تحميل البروفايلات. تحقّق من قواعد قاعدة البيانات.','Failed to load profiles. Check the database rules.')}</div>`;
+    }
+  }
+
+  /* ---------- QR code generator (shared modal) ----------
+     Renders a QR for any public link (profile / blog) so the client can print it,
+     share it, or let visitors scan it. The image is produced by the free goqr.me
+     endpoint (CORS-enabled), then downloaded as a blob; if that fails we fall back
+     to opening the image directly. Needs an internet connection. */
+  const qrImgSrc=(url,size=440)=>'https://api.qrserver.com/v1/create-qr-code/?margin=12&size='+size+'x'+size+'&data='+encodeURIComponent(url);
+  function closeQR(){ const o=$('#qrOv'); if(o) o.remove(); }
+  function openQR(url, label){
+    closeQR();
+    const safeLabel = label ? String(label).slice(0,60) : t('رابط','Link');
+    const ov=document.createElement('div');
+    ov.id='qrOv';
+    ov.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:18px';
+    ov.innerHTML=`<div class="qr-card" style="background:var(--panel,#fff);color:var(--txt,#111);max-width:400px;width:100%;border-radius:18px;padding:24px 22px;box-shadow:0 20px 60px rgba(0,0,0,.45);position:relative;border:1px solid var(--line,rgba(0,0,0,.12));text-align:center">
+      <button id="qrClose" title="${t('إغلاق','Close')}" style="position:absolute;top:12px;inset-inline-end:12px;background:none;border:none;font-size:22px;cursor:pointer;color:inherit;line-height:1">✕</button>
+      <h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;margin:2px 0 4px">${t('رمز QR','QR code')}</h3>
+      <p class="sub" style="margin-bottom:16px;word-break:break-word">${esc(safeLabel)}</p>
+      <div style="background:#fff;border-radius:14px;padding:14px;display:inline-block;box-shadow:0 4px 18px rgba(0,0,0,.12)">
+        <img id="qrImg" src="${esc(qrImgSrc(url))}" alt="QR" width="240" height="240" style="display:block;width:240px;height:240px;image-rendering:pixelated" onerror="this.parentElement.innerHTML='<div style=&quot;padding:40px;color:#b91c1c;font-size:13px&quot;>${t('تعذّر إنشاء الرمز — تحقّق من الاتصال','Could not create the code — check your connection')}</div>'"/>
+      </div>
+      <div style="display:flex;gap:8px;margin:16px 0 10px">
+        <input id="qrLink" value="${esc(url)}" readonly dir="ltr" style="flex:1;min-width:0;font-family:monospace;font-size:12px"/>
+        <button class="btn ghost" id="qrCopy" style="flex:0 0 auto">${t('نسخ','Copy')}</button>
+      </div>
+      <button class="btn primary" id="qrDl" style="width:100%">${IC2.up} ${t('تحميل الرمز (PNG)','Download code (PNG)')}</button>
+      <p class="sub" style="font-size:12px;margin-top:12px;opacity:.8">${t('اطبعه أو ضعه على بطاقتك — أي شخص يصوّره يفتح الرابط مباشرة.','Print it or add it to your card — anyone who scans it opens the link instantly.')}</p>
+    </div>`;
+    document.body.appendChild(ov);
+    $('#qrClose').onclick=closeQR;
+    ov.onclick=e=>{ if(e.target===ov) closeQR(); };
+    document.addEventListener('keydown',function esc0(e){ if(e.key==='Escape'){ closeQR(); document.removeEventListener('keydown',esc0); } });
+    $('#qrCopy').onclick=()=>{ try{ navigator.clipboard.writeText(url); }catch(e){ const i=$('#qrLink'); try{ i.select(); document.execCommand('copy'); }catch(_){}} toast(t('تم نسخ الرابط ✓','Link copied ✓')); };
+    $('#qrDl').onclick=async()=>{
+      const fname='elgoharyX-qr-'+String(safeLabel).replace(/[^\w؀-ۿ-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40).toLowerCase()+'.png';
+      try{
+        const r=await fetch(qrImgSrc(url,600));
+        if(!r.ok) throw new Error('bad');
+        const blob=await r.blob();
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(blob); a.download=fname||'elgoharyX-qr.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+        toast(t('تم تحميل الرمز ✓','QR downloaded ✓'));
+      }catch(e){ window.open(qrImgSrc(url,600),'_blank','noopener'); }
+    };
+  }
+
+  /* ---------- workspace hub: all profiles + the blog in one screen ----------
+     The client lands here from the main screen to manage everything in one place:
+     view / edit / copy-link / QR / delete every profile, plus the account's blog. */
+  async function showHub(){
+    if(!currentUser){ showAuth('login'); return; }
+    document.title=t('لوحتي — كل بروفايلاتي ومدوناتي | elgoharyX','My Hub — all my profiles & blogs | elgoharyX');
+    document.body.style.background='';
+    $('#app').innerHTML = appbar('hub') + `<div class="wrap">
+      <div class="mp-head">
+        <div><h2>${t('لوحتي','My Hub')}</h2><div class="sub">${t('كل بروفايلاتك ومدوناتك في مكان واحد — اعرض، عدّل، شارك، وأنشئ رمز QR بضغطة.','All your profiles and blogs in one place — view, edit, share, and make a QR code in one tap.')}</div></div>
+        <div class="hub-head-acts">
+          <a class="btn primary" href="${urlNewProfile()}" style="width:auto;padding:11px 18px">+ ${t('بروفايل','Profile')}</a>
+          <a class="btn ghost" href="${urlNewBlog()}" style="width:auto;padding:11px 18px">+ ${t('مدونة','Blog')}</a>
+        </div>
+      </div>
+      <div class="hub-sec">
+        <div class="hub-sec-bar"><h3>${TAB.cards} ${t('بروفايلاتي','My Profiles')} <span id="hubPCount" class="hub-count"></span></h3>
+          <a class="hub-more" href="${urlMyProfiles()}">${t('إدارة كل البروفايلات','Manage all profiles')} ›</a></div>
+        <div id="hubProfiles">${skelGrid(3)}</div>
+      </div>
+      <div class="hub-sec">
+        <div class="hub-sec-bar"><h3>${UICON.chat} ${t('مدونتي','My Blog')}</h3>
+          <a class="hub-more" href="${urlMyBlog()}">${t('إدارة التدوينات','Manage posts')} ›</a></div>
+        <div id="hubBlog">${skelGrid(1)}</div>
+      </div>
+    </div>` + drawer('hub');
+    wireAppbar();
+
+    /* ----- profiles ----- */
+    try{
+      const s=await get(child(ref(db),'userProfiles/'+currentUser.uid));
+      const list = s.exists()? Object.entries(s.val()).map(([id,v])=>({id,...v})) : [];
+      list.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+      const cnt=$('#hubPCount'); if(cnt) cnt.textContent=list.length?('· '+list.length):'';
+      if(!list.length){
+        $('#hubProfiles').innerHTML=`<div class="mp-empty">${t('لا توجد بروفايلات بعد.','No profiles yet.')}<br><br>
+          <a class="btn primary" href="${urlNewProfile()}" style="width:auto;padding:11px 20px">${t('أنشئ أول بروفايل','Create your first profile')}</a></div>`;
+      }else{
+        $('#hubProfiles').innerHTML=`<div class="mp-grid">${list.map(p=>`
+          <div class="mp-card">
+            <div class="mp-cover" style="background:${COVERS[p.template]||COVERS.royal}"><span class="badge">${esc((TEMPLATES.find(t=>t.id===p.template)||{}).name||'')}</span>${p.locked?'<span class="mp-lock" title="'+t('محمي بكلمة مرور','Password protected')+'">🔒</span>':''}</div>
+            <div class="mp-body">
+              <div class="mp-name">${esc(p.name||t('بدون اسم','Untitled'))}</div>
+              <div class="mp-meta">${t('آخر تحديث:','Last update:')} ${p.updatedAt?new Date(p.updatedAt).toLocaleDateString(curLang()==='en'?'en-GB':'ar-EG'):'—'}</div>
+              <div class="mp-actions">
+                <a href="${urlProfileView(p.id)}" target="_blank">${IC2.eye} ${t('عرض','View')}</a>
+                <button data-hedit="${p.id}">${IC2.pen} ${t('تعديل','Edit')}</button>
+                <button data-hlink="${p.id}">${IC2.link} ${t('الرابط','Link')}</button>
+                <button data-hqr="${p.id}" data-hqrname="${esc(p.name||'')}">${IC2.qr} ${t('رمز QR','QR code')}</button>
+                <button class="del" data-hdel="${p.id}">${t('حذف','Delete')}</button>
+              </div>
+            </div>
+          </div>`).join('')}</div>`;
+        $('#hubProfiles').querySelectorAll('[data-hedit]').forEach(b=>b.onclick=()=>startEdit(b.dataset.hedit));
+        $('#hubProfiles').querySelectorAll('[data-hlink]').forEach(b=>b.onclick=()=>{navigator.clipboard?.writeText(urlProfileView(b.dataset.hlink));toast(t('تم نسخ رابط العرض ✓','View link copied ✓'));});
+        $('#hubProfiles').querySelectorAll('[data-hqr]').forEach(b=>b.onclick=()=>openQR(urlProfileView(b.dataset.hqr), b.dataset.hqrname||t('بروفايل','Profile')));
+        $('#hubProfiles').querySelectorAll('[data-hdel]').forEach(b=>b.onclick=async()=>{
+          if(!confirm(t('حذف هذا البروفايل نهائياً؟','Permanently delete this profile?'))) return;
+          try{ await remove(ref(db,'profiles/'+b.dataset.hdel)); await remove(ref(db,'userProfiles/'+currentUser.uid+'/'+b.dataset.hdel)); toast(t('تم الحذف','Deleted')); showHub(); }
+          catch(e){ console.error(e); toast(t('تعذّر الحذف','Delete failed')); }
+        });
+      }
+    }catch(e){
+      console.error(e);
+      $('#hubProfiles').innerHTML=`<div class="mp-empty">${t('تعذّر تحميل البروفايلات.','Failed to load profiles.')}</div>`;
+    }
+
+    /* ----- blog ----- */
+    try{
+      const s=await get(child(ref(db),'userBlogs/'+currentUser.uid));
+      const entries = s.exists()? Object.entries(s.val()) : [];
+      if(!entries.length){
+        $('#hubBlog').innerHTML=`<div class="mp-empty">${t('لا توجد مدونة بعد.','No blog yet.')}<br><br>
+          <a class="btn primary" href="${urlNewBlog()}" style="width:auto;padding:11px 20px">${t('أنشئ مدونتك','Create your Blog')}</a></div>`;
+      }else{
+        entries.sort((a,b)=>((b[1]&&b[1].updatedAt)||0)-((a[1]&&a[1].updatedAt)||0));
+        const id=entries[0][0]; const b=entries[0][1]||{};
+        let count=''; try{ const ix=await get(child(ref(db),'blogIndex/'+id)); if(ix.exists()&&ix.val()&&ix.val().count!=null) count=ix.val().count+' '+t('تدوينة','posts'); }catch(_){}
+        const dz=blogDesign(b.design);
+        const grad=`linear-gradient(135deg,${dz.accent},${dz.accent2})`;
+        $('#hubBlog').innerHTML=`<div class="mp-grid"><div class="mp-card hub-blog-card">
+          <div class="mp-cover" style="background:${grad}"><span class="badge">${esc(dz.name||'')}</span></div>
+          <div class="mp-body">
+            <div class="mp-name">${esc(b.title||t('مدونتي','My Blog'))}</div>
+            <div class="mp-meta">${count?count+' · ':''}${t('آخر تحديث:','Last update:')} ${b.updatedAt?new Date(b.updatedAt).toLocaleDateString(curLang()==='en'?'en-GB':'ar-EG'):'—'}</div>
+            <div class="mp-actions">
+              <a href="${urlBlogView(id)}" target="_blank">${IC2.eye} ${t('عرض','View')}</a>
+              <a href="${urlMyBlog()}">${IC2.pen} ${t('إدارة التدوينات','Manage posts')}</a>
+              <button data-hbloglink>${IC2.link} ${t('الرابط','Link')}</button>
+              <button data-hblogqr>${IC2.qr} ${t('رمز QR','QR code')}</button>
+            </div>
+          </div>
+        </div></div>`;
+        const lk=$('#hubBlog').querySelector('[data-hbloglink]'); if(lk) lk.onclick=()=>{navigator.clipboard?.writeText(urlBlogView(id));toast(t('تم نسخ رابط المدونة ✓','Blog link copied ✓'));};
+        const qr=$('#hubBlog').querySelector('[data-hblogqr]'); if(qr) qr.onclick=()=>openQR(urlBlogView(id), b.title||t('مدونتي','My Blog'));
+      }
+    }catch(e){
+      console.error(e);
+      $('#hubBlog').innerHTML=`<div class="mp-empty">${t('تعذّر تحميل المدونة.','Failed to load the blog.')}</div>`;
     }
   }
 
@@ -2435,6 +2419,7 @@ const auth = getAuth(app);
         <div class="badm-acts">
           <a href="${urlBlogView(id)}" target="_blank">${IC2.eye} ${t('عرض المدونة','View Blog')}</a>
           <button id="baLink">${IC2.link} ${t('نسخ الرابط','Copy Link')}</button>
+          <button id="baQR">${IC2.qr} ${t('رمز QR','QR code')}</button>
           <button id="baEdit">${IC2.pen} ${t('تعديل بيانات المدونة','Edit Blog Details')}</button>
         </div>
       </div>
@@ -2479,6 +2464,7 @@ const auth = getAuth(app);
       };
       const wire=()=>{
         $('#baLink')&&($('#baLink').onclick=()=>{navigator.clipboard?.writeText(urlBlogView(id));toast(t('تم نسخ رابط المدونة ✓','Blog link copied ✓'));});
+        $('#baQR')&&($('#baQR').onclick=()=>openQR(urlBlogView(id), d.title||t('مدونتي','My Blog')));
         $('#baEdit')&&($('#baEdit').onclick=()=>startBlogEdit(id));
         $('#baNew')&&($('#baNew').onclick=()=>startBlogEdit(id,'new'));
         document.querySelectorAll('[data-pedit]').forEach(b=>b.onclick=()=>startBlogEdit(id,+b.dataset.pedit));
@@ -3053,14 +3039,69 @@ const auth = getAuth(app);
   };
   /* ▲▲▲ */
   const emailjsReady = () => EMAILJS.publicKey && !EMAILJS.publicKey.startsWith('YOUR_');
+  /* ---- backup email (EmailJS) keys ----
+     The hardcoded EMAILJS above is the primary; the admin can add backup credential
+     sets in config/emailKeys. Sending tries each set in order, so when one account
+     hits its monthly send limit the next one is used automatically. */
+  let _emailKeys=null;
+  const cleanEmailSet = x => ({
+    publicKey:String((x&&x.publicKey)||'').trim(), serviceId:String((x&&x.serviceId)||'').trim(),
+    templateId:String((x&&x.templateId)||'').trim(), notifyTemplateId:String((x&&x.notifyTemplateId)||'').trim(),
+    toEmail:String((x&&x.toEmail)||'').trim()
+  });
+  const validEmailSet = x => x.publicKey && !x.publicKey.startsWith('YOUR_') && x.serviceId && x.templateId;
+  async function loadEmailBackups(){
+    let arr=[];
+    try{ const s=await get(child(ref(db),'config/emailKeys')); if(s.exists()){ const v=s.val(); arr=Array.isArray(v)?v:Object.values(v||{}); } }catch(e){}
+    return arr.map(cleanEmailSet).filter(validEmailSet);
+  }
+  async function emailKeyList(){
+    if(_emailKeys) return _emailKeys;
+    _emailKeys=[EMAILJS, ...(await loadEmailBackups())];   // primary first, then backups
+    return _emailKeys;
+  }
+  const clearEmailKeysCache=()=>{ _emailKeys=null; };
+  async function saveEmailBackups(list){
+    const clean=(list||[]).map(cleanEmailSet).filter(validEmailSet);
+    await set(ref(db,'config/emailKeys'), clean);
+    _emailKeys=null;
+    return clean;
+  }
+  /* send one EmailJS message, rotating through primary + backups until one succeeds */
+  async function emailjsSend(kind, params){
+    const keys=await emailKeyList();
+    for(const k of keys){
+      if(!k || !k.publicKey || k.publicKey.startsWith('YOUR_')) continue;
+      const tpl = (kind==='notify' && k.notifyTemplateId && !k.notifyTemplateId.startsWith('YOUR_')) ? k.notifyTemplateId : k.templateId;
+      const p = (kind==='admin' && k.toEmail) ? { ...params, to_email:k.toEmail } : params;
+      try{
+        const r=await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ service_id:k.serviceId, template_id:tpl, user_id:k.publicKey, template_params:p })
+        });
+        if(r.ok) return true;   // else quota/limit → try the next key
+      }catch(e){ /* network error → try the next key */ }
+    }
+    return false;
+  }
   async function notifyAdminEmail(fields){
     if(!emailjsReady()) return; // لم تُضبط بعد — نتجاهل بهدوء
-    try{
-      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ service_id:EMAILJS.serviceId, template_id:EMAILJS.templateId, user_id:EMAILJS.publicKey, template_params:fields })
-      });
-    }catch(e){ console.warn('email notify failed', e); }
+    await emailjsSend('admin', fields);
+  }
+  /* ---- captcha (reCAPTCHA / App Check) keys — admin-editable ----
+     App Check runs in firebase.js from localStorage (before any DB read), so saving
+     mirrors to BOTH localStorage (what actually applies) and config/captchaKeys. */
+  async function loadCaptchaKeys(){
+    try{ const s=localStorage.getItem('apb_captcha_keys'); if(s){ const a=JSON.parse(s); if(Array.isArray(a)&&a.filter(Boolean).length) return a.filter(Boolean).map(x=>String(x).trim()); } }catch(e){}
+    try{ const s=await get(child(ref(db),'config/captchaKeys')); if(s.exists()){ const v=s.val(); const clean=(Array.isArray(v)?v:Object.values(v||{})).map(x=>String(x||'').trim()).filter(Boolean);
+      if(clean.length){ try{ localStorage.setItem('apb_captcha_keys', JSON.stringify(clean)); }catch(e){} return clean; } } }catch(e){}
+    return captchaKeys();
+  }
+  async function saveCaptchaKeys(keys){
+    const clean=(keys||[]).map(k=>String(k||'').trim()).filter(Boolean);
+    try{ localStorage.setItem('apb_captcha_keys', JSON.stringify(clean)); }catch(e){}
+    await set(ref(db,'config/captchaKeys'), clean);
+    return clean;
   }
   const CROWN='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.5 8.5 6.5 12l3.7-6 1.8 0L15.5 12l4-3.5-1.7 10.5H4.2L2.5 8.5Zm3.2 10.5h12.6"/></svg>';
   const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="26" height="26"><path d="M20 6 9 17l-5-5"/></svg>';
@@ -3173,8 +3214,6 @@ const auth = getAuth(app);
      variable the EmailJS template happens to reference. */
   async function sendUserEmail(toEmail, title, body, toName){
     if(!emailjsReady() || !toEmail) return false;
-    const tpl = (EMAILJS.notifyTemplateId && !EMAILJS.notifyTemplateId.startsWith('YOUR_'))
-      ? EMAILJS.notifyTemplateId : EMAILJS.templateId;
     const bodyText = (body && body.trim()) ? body : title;   // never empty
     const full = (body && body.trim()) ? (title + '\n\n' + body) : title;
     const params = {
@@ -3189,22 +3228,27 @@ const auth = getAuth(app);
       // harmless extras kept so the fallback payment template renders cleanly
       method: t('📢 إشعار','📢 Notification'), amount: '', screenshot: '', link: urlHome()
     };
-    try{
-      const r=await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ service_id:EMAILJS.serviceId, template_id:tpl, user_id:EMAILJS.publicKey, template_params:params })
-      });
-      return r.ok;
-    }catch(e){ console.warn('user email failed', e); return false; }
+    return emailjsSend('notify', params);   // rotates through primary + backup keys
   }
 
   let adminEmail = undefined; // undefined = not loaded yet, null = none
-  async function loadAdminEmail(){
-    // session cache: read the admin email from the DB only once per browser session
-    try{ const c=sessionStorage.getItem(ADMIN_EMAIL_KEY); if(c!==null){ adminEmail = c||null; return adminEmail; } }catch(e){}
-    try{ const s=await get(child(ref(db),'config/adminEmail')); adminEmail = s.exists()? String(s.val()).trim().toLowerCase() : null; }
-    catch(e){ adminEmail = null; }
-    try{ sessionStorage.setItem(ADMIN_EMAIL_KEY, adminEmail||''); }catch(e){}
+  async function loadAdminEmail(force){
+    // session cache: read the admin email from the DB only once per browser session.
+    // IMPORTANT: only a SUCCESSFUL, non-empty read is ever cached. A failed or empty
+    // read is never persisted, otherwise a single transient DB hiccup (e.g. right
+    // after a service-worker update, before Firebase is ready) would cache "" and
+    // then return null for the rest of the tab session — locking the real admin out
+    // of the panel with a false 404 until they closed every tab. `force` bypasses the
+    // cache to re-verify straight from the DB (used by the admin gate).
+    if(!force){
+      try{ const c=sessionStorage.getItem(ADMIN_EMAIL_KEY); if(c){ adminEmail = c; return adminEmail; } }catch(e){}
+    }
+    try{
+      const s=await get(child(ref(db),'config/adminEmail'));
+      adminEmail = s.exists()? String(s.val()).trim().toLowerCase() : null;
+    }
+    catch(e){ if(adminEmail===undefined) adminEmail = null; }   // don't downgrade a known-good value on error
+    try{ if(adminEmail) sessionStorage.setItem(ADMIN_EMAIL_KEY, adminEmail); }catch(e){}
     return adminEmail;
   }
   const isAdmin = () => !!(currentUser && adminEmail && (currentUser.email||'').trim().toLowerCase()===adminEmail);
@@ -3333,16 +3377,33 @@ const auth = getAuth(app);
     }catch(e){ console.error(e); toast(t('تعذّر التفعيل — تأكد أنك داخل بحساب الأدمن','Activation failed — make sure you are signed in with the admin account')); }
   }
 
+  /* blank 404 page — shown to anyone who opens the admin section without being the
+     admin (logged out, or a signed-in non-admin). Replaces the whole page so the
+     admin panel's existence is fully hidden: a white page with only "404" on it. */
+  function showAdmin404(){
+    try{ document.title='404'; }catch(e){}
+    const html='<div style="position:fixed;inset:0;margin:0;display:flex;align-items:center;justify-content:center;background:#fff;color:#111;font-family:system-ui,-apple-system,\'Segoe UI\',Arial,sans-serif;font-weight:700;font-size:clamp(64px,18vw,150px);letter-spacing:2px">404</div>';
+    try{ document.body.style.cssText='margin:0;background:#fff'; document.body.innerHTML=html; }
+    catch(e){ document.documentElement.innerHTML='<body style="margin:0;background:#fff">'+html+'</body>'; }
+  }
   async function showAdmin(){
-    if(!currentUser){ gotoLogin(); return; }
+    if(adminEmail===undefined) await loadAdminEmail();
+    // before locking a signed-in user out with a 404, re-verify the admin email
+    // straight from the DB — guards against a stale/empty cached value wrongly
+    // 404ing the real admin (see loadAdminEmail).
+    if(currentUser && !isAdmin()) await loadAdminEmail(true);
+    if(!isAdmin()){ showAdmin404(); return; }     // non-admins get a blank 404 — the panel stays hidden
     document.title=t('لوحة تحكّم الأدمن — elgoharyX','Admin Dashboard — elgoharyX');
     document.body.style.background='';
     $('#app').innerHTML = appbar('admin') + `<div class="wrap">${skelGrid(3)}</div>` + drawer('admin');
     wireAppbar();
-    if(adminEmail===undefined) await loadAdminEmail();
     const fbAuthed = !!(auth && auth.currentUser);
-    const adminGateObj = await loadAdminGate();   // panel password (hides the admin email)
+    // load everything the panel needs in parallel (each already falls back safely on error)
+    const [adminGateObj, imgKeys, captchaList, emailBackups] = await Promise.all([
+      loadAdminGate(), loadImageKeys(), loadCaptchaKeys(), loadEmailBackups()
+    ]);
     const adminGateSet = !!adminGateObj;
+    const dbInfo = dbState();                      // primary + backup DB URLs and active write index
     // "set admin email" + "panel password" cards
     const setupCard = () => `<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
         <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">${t('إعداد بريد الأدمن','Admin email setup')}</h3>
@@ -3366,7 +3427,64 @@ const auth = getAuth(app);
         <button class="btn primary" id="admPassSave" style="width:100%">${adminGateSet?t('تغيير كلمة المرور','Change password'):t('حفظ كلمة المرور','Save password')}</button>
         ${adminGateSet?`<button class="btn del" id="admPassRemove" style="width:100%;margin-top:8px">${t('إزالة كلمة المرور','Remove password')}</button>`:''}
         <div class="pm-note" id="admPassMsg"></div>
+      </div>`:''}
+      ${isAdmin()?`<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">🖼️ ${t('مفاتيح رفع الصور (imgbb)','Image upload keys (imgbb)')}</h3>
+        <div class="sub" style="margin-bottom:14px">${t('كل مفتاح في خانة مستقلة. تُجرَّب بالترتيب، فإذا فشل رفع صورة بأحدها ينتقل تلقائياً للتالي في الخلفية حتى تُرفع الصورة.','Each key in its own box. They are tried in order — if an upload fails on one, it automatically switches to the next in the background until the image uploads.')} <a href="https://api.imgbb.com/" target="_blank" rel="noopener" style="color:var(--gold)">imgbb</a></div>
+        <div id="imgKeysList">${(imgKeys.length?imgKeys:['']).map(imgKeyRow).join('')}</div>
+        <button class="btn ghost" id="imgKeysAdd" style="width:100%;margin-top:2px">＋ ${t('إضافة مفتاح آخر','Add another key')}</button>
+        <button class="btn primary" id="imgKeysSave" style="width:100%;margin-top:10px">${t('حفظ المفاتيح','Save keys')}</button>
+        <div class="pm-note" id="imgKeysMsg"></div>
+      </div>`:''}
+      ${isAdmin()?`<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">🛡️ ${t('مفاتيح كاباتشا (reCAPTCHA / App Check)','Captcha keys (reCAPTCHA / App Check)')}</h3>
+        <div class="sub" style="margin-bottom:14px">${t('المفتاح الأول هو المُفعَّل، والباقي احتياطي يمكنك ترقيته. يُطبَّق عند إعادة تحميل الصفحة، ويُحفظ في هذا المتصفح.','The first key is the active one; the rest are spares you can promote. Applied on page reload and saved in this browser.')} <a href="https://www.google.com/recaptcha/admin" target="_blank" rel="noopener" style="color:var(--gold)">reCAPTCHA</a></div>
+        <div id="capKeysList">${(captchaList.length?captchaList:['']).map(capKeyRow).join('')}</div>
+        <button class="btn ghost" id="capKeysAdd" style="width:100%;margin-top:2px">＋ ${t('إضافة مفتاح احتياطي','Add a spare key')}</button>
+        <button class="btn primary" id="capKeysSave" style="width:100%;margin-top:10px">${t('حفظ مفاتيح الكاباتشا','Save captcha keys')}</button>
+        <div class="pm-note" id="capKeysMsg"></div>
+      </div>`:''}
+      ${isAdmin()?`<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">✉️ ${t('مفاتيح الإيميل الاحتياطية (EmailJS)','Backup email keys (EmailJS)')}</h3>
+        <div class="sub" style="margin-bottom:14px">${t('المفتاح الأساسي مضبوط في الكود. أضف حسابات EmailJS احتياطية — تُجرَّب بالترتيب، فإذا نفد حد الإرسال الشهري لأحدها يُستخدم التالي تلقائياً.','The primary key is set in the code. Add backup EmailJS accounts — they are tried in order, so when one hits its monthly send limit the next is used automatically.')} <a href="https://dashboard.emailjs.com/admin" target="_blank" rel="noopener" style="color:var(--gold)">EmailJS</a></div>
+        <div id="emlList">${(emailBackups.length?emailBackups:[{}]).map(emailSetRow).join('')}</div>
+        <button class="btn ghost" id="emlAdd" style="width:100%;margin-top:2px">＋ ${t('إضافة حساب احتياطي','Add a backup account')}</button>
+        <button class="btn primary" id="emlSave" style="width:100%;margin-top:10px">${t('حفظ مفاتيح الإيميل','Save email keys')}</button>
+        <div class="pm-note" id="emlMsg"></div>
+      </div>`:''}
+      ${isAdmin()?`<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">🗄️ ${t('قواعد البيانات الاحتياطية (تكامل)','Backup databases (federation)')}</h3>
+        <div class="sub" style="margin-bottom:14px">${t('القراءة تُدمج من كل القواعد، والكتابة الجديدة تروح للقاعدة النشطة (وتنتقل تلقائياً للتالية عند الامتلاء). لازم تنشر نفس القواعد على كل قاعدة احتياطية. يُطبَّق بعد إعادة التحميل.','Reads merge across all databases; new writes go to the active one (and advance automatically when it fills). Publish the same security rules on every backup. Applied after a reload.')}</div>
+        <div class="field"><label>${t('القاعدة الأساسية (ثابتة)','Primary database (fixed)')}</label><input value="${esc(dbInfo.urls[0]||'')}" dir="ltr" readonly style="opacity:.7;font-family:monospace;font-size:12px"/></div>
+        <label style="font-size:13px;font-weight:600;display:block;margin:4px 0 6px">${t('قواعد احتياطية','Backup databases')}</label>
+        <div id="dbList">${(dbInfo.backups.length?dbInfo.backups:['']).map(dbUrlRow).join('')}</div>
+        <button class="btn ghost" id="dbAdd" style="width:100%;margin-top:2px">＋ ${t('إضافة قاعدة احتياطية','Add a backup database')}</button>
+        <div class="field" style="margin-top:12px"><label>${t('قاعدة الكتابة النشطة','Active write database')}</label>
+          <select id="dbActive" dir="ltr" style="width:100%">${dbInfo.urls.map((u,i)=>`<option value="${i}" ${i===dbInfo.active?'selected':''}>${i===0?t('الأساسية','Primary')+' — ':''}${esc(u)}</option>`).join('')}</select></div>
+        <button class="btn primary" id="dbSave" style="width:100%;margin-top:6px">${t('حفظ إعدادات القواعد','Save database settings')}</button>
+        <div class="pm-note" id="dbMsg"></div>
       </div>`:''}`;
+    // one row = one API key box + a remove button (used on first render and by "add another")
+    const imgKeyRow = (k='')=>`<div class="imgkey-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+        <input class="imgkey-inp" dir="ltr" value="${esc(k)}" placeholder="${t('مفتاح imgbb API','imgbb API key')}" autocomplete="off" spellcheck="false" style="flex:1;min-width:0;font-family:monospace"/>
+        <button type="button" class="btn del imgkey-del" title="${t('حذف','Remove')}" style="padding:8px 12px;flex:0 0 auto">✕</button>
+      </div>`;
+    const capKeyRow = (k='')=>`<div class="cap-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+        <input class="cap-inp" dir="ltr" value="${esc(k)}" placeholder="${t('مفتاح موقع reCAPTCHA v3','reCAPTCHA v3 site key')}" autocomplete="off" spellcheck="false" style="flex:1;min-width:0;font-family:monospace"/>
+        <button type="button" class="btn del cap-del" title="${t('حذف','Remove')}" style="padding:8px 12px;flex:0 0 auto">✕</button>
+      </div>`;
+    const dbUrlRow = (u='')=>`<div class="db-row" style="display:flex;gap:8px;margin-bottom:8px;align-items:center">
+        <input class="db-inp" dir="ltr" value="${esc(u)}" placeholder="https://your-backup-default-rtdb.firebaseio.com" autocomplete="off" spellcheck="false" style="flex:1;min-width:0;font-family:monospace;font-size:12px"/>
+        <button type="button" class="btn del db-del" title="${t('حذف','Remove')}" style="padding:8px 12px;flex:0 0 auto">✕</button>
+      </div>`;
+    const emailSetRow = (s={})=>`<div class="eml-row" style="border:1px solid var(--stroke);border-radius:12px;padding:12px;margin-bottom:10px;position:relative">
+        <button type="button" class="btn del eml-del" title="${t('حذف','Remove')}" style="position:absolute;top:8px;inset-inline-end:8px;padding:4px 10px">✕</button>
+        <div class="field"><label>Public Key</label><input class="eml-pk" dir="ltr" value="${esc(s.publicKey||'')}" autocomplete="off"/></div>
+        <div class="field"><label>Service ID</label><input class="eml-sv" dir="ltr" value="${esc(s.serviceId||'')}" autocomplete="off"/></div>
+        <div class="field"><label>Template ID</label><input class="eml-tp" dir="ltr" value="${esc(s.templateId||'')}" autocomplete="off"/></div>
+        <div class="field"><label>Notify Template ID (${t('اختياري','optional')})</label><input class="eml-nt" dir="ltr" value="${esc(s.notifyTemplateId||'')}" autocomplete="off"/></div>
+        <div class="field"><label>To Email</label><input class="eml-to" dir="ltr" value="${esc(s.toEmail||'')}" autocomplete="off"/></div>
+      </div>`;
     const wireSetup = () => {
       // save the admin email
       const b=$('#admSave');
@@ -3394,13 +3512,83 @@ const auth = getAuth(app);
       if(pr) pr.onclick=async()=>{ if(!confirm(t('إزالة كلمة مرور اللوحة؟ سيصبح بريد الأدمن ظاهراً لمن يفتح القسم.','Remove the panel password? The admin email will become visible to anyone who opens the section.')))return;
         try{ await remove(ref(db,'config/adminGate')); clearAdminUnlock(); toast(t('تمت إزالة كلمة المرور','Password removed')); showAdmin(); }
         catch(e){ console.error(e); toast(t('تعذّر — تأكد أنك أدمن','Failed — make sure you are the admin')); } };
+      // image-upload keys: each key in its own box, with add / remove
+      const list=$('#imgKeysList');
+      const add=$('#imgKeysAdd');
+      if(add && list) add.onclick=()=>{ list.insertAdjacentHTML('beforeend', imgKeyRow('')); const inps=list.querySelectorAll('.imgkey-inp'); const last=inps[inps.length-1]; if(last) last.focus(); };
+      // remove a row (delegated) — always keep at least one empty box on screen
+      if(list) list.onclick=(e)=>{ const del=e.target.closest('.imgkey-del'); if(!del) return;
+        const rows=list.querySelectorAll('.imgkey-row');
+        if(rows.length<=1){ const inp=list.querySelector('.imgkey-inp'); if(inp) inp.value=''; }
+        else del.closest('.imgkey-row').remove();
+      };
+      const ik=$('#imgKeysSave');
+      if(ik) ik.onclick=async()=>{
+        const msg=$('#imgKeysMsg');
+        const keys=[...(list?list.querySelectorAll('.imgkey-inp'):[])].map(i=>i.value.trim()).filter(Boolean);
+        if(!keys.length){ msg.className='pm-note'; msg.textContent=t('أضف مفتاحاً واحداً على الأقل','Add at least one key'); return; }
+        ik.disabled=true; const old=ik.textContent; ik.textContent=t('جارٍ الحفظ…','Saving…');
+        try{ const saved=await saveImageKeys(keys);
+          msg.className='pm-note ok'; msg.textContent=t('تم حفظ المفاتيح ✓','Keys saved ✓')+' ('+saved.length+')';
+        }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent=t('تعذّر الحفظ — تأكد أنك أدمن (Google) وأن القواعد المحدّثة منشورة','Failed to save — make sure you are the admin (Google) and the updated rules are published'); }
+        ik.disabled=false; ik.textContent=old;
+      };
+      // captcha (reCAPTCHA) keys: box per key, add / remove, save to localStorage + config
+      const capList=$('#capKeysList'), capAdd=$('#capKeysAdd'), capSave=$('#capKeysSave');
+      if(capAdd && capList) capAdd.onclick=()=>{ capList.insertAdjacentHTML('beforeend', capKeyRow('')); const ii=capList.querySelectorAll('.cap-inp'); const l=ii[ii.length-1]; if(l) l.focus(); };
+      if(capList) capList.onclick=(e)=>{ const del=e.target.closest('.cap-del'); if(!del) return;
+        const rows=capList.querySelectorAll('.cap-row');
+        if(rows.length<=1){ const inp=capList.querySelector('.cap-inp'); if(inp) inp.value=''; } else del.closest('.cap-row').remove(); };
+      if(capSave) capSave.onclick=async()=>{
+        const msg=$('#capKeysMsg');
+        const keys=[...(capList?capList.querySelectorAll('.cap-inp'):[])].map(i=>i.value.trim()).filter(Boolean);
+        if(!keys.length){ msg.className='pm-note'; msg.textContent=t('أضف مفتاحاً واحداً على الأقل','Add at least one key'); return; }
+        capSave.disabled=true; const old=capSave.textContent; capSave.textContent=t('جارٍ الحفظ…','Saving…');
+        try{ const saved=await saveCaptchaKeys(keys);
+          msg.className='pm-note ok'; msg.textContent=t('تم الحفظ ✓ — أعد تحميل الصفحة للتفعيل','Saved ✓ — reload the page to apply')+' ('+saved.length+')';
+        }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent=t('حُفظ محلياً، لكن تعذّر الحفظ في القاعدة — تأكد أنك أدمن والقواعد منشورة','Saved locally, but saving to the database failed — make sure you are the admin and the rules are published'); }
+        capSave.disabled=false; capSave.textContent=old;
+      };
+      // backup email (EmailJS) accounts: repeatable 5-field sets, add / remove, save to config
+      const emlList=$('#emlList'), emlAdd=$('#emlAdd'), emlSave=$('#emlSave');
+      if(emlAdd && emlList) emlAdd.onclick=()=>{ emlList.insertAdjacentHTML('beforeend', emailSetRow({})); const r=emlList.querySelector('.eml-row:last-child .eml-pk'); if(r) r.focus(); };
+      if(emlList) emlList.onclick=(e)=>{ const del=e.target.closest('.eml-del'); if(!del) return;
+        const rows=emlList.querySelectorAll('.eml-row');
+        if(rows.length<=1){ del.closest('.eml-row').querySelectorAll('input').forEach(i=>i.value=''); } else del.closest('.eml-row').remove(); };
+      if(emlSave) emlSave.onclick=async()=>{
+        const msg=$('#emlMsg');
+        const sets=[...(emlList?emlList.querySelectorAll('.eml-row'):[])].map(r=>({
+          publicKey:(r.querySelector('.eml-pk').value||'').trim(), serviceId:(r.querySelector('.eml-sv').value||'').trim(),
+          templateId:(r.querySelector('.eml-tp').value||'').trim(), notifyTemplateId:(r.querySelector('.eml-nt').value||'').trim(),
+          toEmail:(r.querySelector('.eml-to').value||'').trim()
+        })).filter(s=>s.publicKey||s.serviceId||s.templateId);
+        emlSave.disabled=true; const old=emlSave.textContent; emlSave.textContent=t('جارٍ الحفظ…','Saving…');
+        try{ const saved=await saveEmailBackups(sets);
+          msg.className='pm-note ok'; msg.textContent=t('تم حفظ الحسابات الاحتياطية ✓','Backup accounts saved ✓')+' ('+saved.length+')';
+        }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent=t('تعذّر الحفظ — تأكد أنك أدمن (Google) وأن القواعد المحدّثة منشورة','Failed to save — make sure you are the admin (Google) and the updated rules are published'); }
+        emlSave.disabled=false; emlSave.textContent=old;
+      };
+      // backup databases: box per backup URL + active-write selector
+      const dbL=$('#dbList'), dbAdd=$('#dbAdd'), dbSave=$('#dbSave');
+      const syncDbActive=()=>{ const sel=$('#dbActive'); if(!sel) return; const urls=[dbInfo.urls[0], ...[...(dbL?dbL.querySelectorAll('.db-inp'):[])].map(i=>i.value.trim()).filter(Boolean)];
+        const cur=sel.value; sel.innerHTML=urls.map((u,i)=>`<option value="${i}">${i===0?t('الأساسية','Primary')+' — ':''}${esc(u)}</option>`).join(''); if(cur<urls.length) sel.value=cur; };
+      if(dbAdd && dbL) dbAdd.onclick=()=>{ dbL.insertAdjacentHTML('beforeend', dbUrlRow('')); const ii=dbL.querySelectorAll('.db-inp'); const l=ii[ii.length-1]; if(l) l.focus(); syncDbActive(); };
+      if(dbL){ dbL.onclick=(e)=>{ const del=e.target.closest('.db-del'); if(!del) return;
+          const rows=dbL.querySelectorAll('.db-row');
+          if(rows.length<=1){ const inp=dbL.querySelector('.db-inp'); if(inp) inp.value=''; } else del.closest('.db-row').remove(); syncDbActive(); };
+        dbL.addEventListener('input', syncDbActive); }
+      if(dbSave) dbSave.onclick=async()=>{
+        const msg=$('#dbMsg');
+        const backups=[...(dbL?dbL.querySelectorAll('.db-inp'):[])].map(i=>i.value.trim()).filter(Boolean);
+        const bad=backups.find(u=>!/^https:\/\/.+/i.test(u));
+        if(bad){ msg.className='pm-note'; msg.textContent=t('رابط قاعدة غير صالح — لازم يبدأ بـ https://','Invalid database URL — it must start with https://'); return; }
+        dbSave.disabled=true; const old=dbSave.textContent; dbSave.textContent=t('جارٍ الحفظ…','Saving…');
+        try{ await saveDbBackups(backups); const sel=$('#dbActive'); if(sel) setActiveDb(parseInt(sel.value,10)||0);
+          msg.className='pm-note ok'; msg.textContent=t('تم الحفظ ✓ — أعد تحميل الصفحة للتفعيل','Saved ✓ — reload the page to apply');
+        }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent=t('حُفظ محلياً، لكن تعذّر الحفظ في القاعدة — تأكد أنك أدمن والقواعد منشورة','Saved locally, but saving to the database failed — make sure you are the admin and the rules are published'); }
+        dbSave.disabled=false; dbSave.textContent=old;
+      };
     };
-    if(!isAdmin()){
-      $('#app').innerHTML = appbar('admin') + `<div class="wrap">${setupCard()}
-        <div class="mp-empty" style="max-width:600px;margin:0 auto">${t('هذه اللوحة للأدمن فقط. بعد حفظ بريدك بالأعلى (وأنت داخل بجوجل) ستصبح الأدمن مباشرة.','This panel is for the admin only. After saving your email above (while signed in with Google) you will become the admin immediately.')}</div>
-      </div>` + drawer('admin');
-      wireAppbar(); wireSetup(); return;
-    }
 
     /* ---------- password gate (hides the admin email behind a password) ---------- */
     if(adminGateSet && !adminUnlocked()){
@@ -3433,12 +3621,31 @@ const auth = getAuth(app);
 
     /* ---------- tabbed control center ---------- */
     let TAB_ID='overview';
-    const TABS=[['overview',t('نظرة عامة','Overview')],['users',t('المستخدمون','Users')],['profiles',t('البروفايلات','Profiles')],
-      ['blogs',t('المدونات','Blogs')],['payments',t('المدفوعات','Payments')],['notify',t('الإشعارات','Notifications')],['config',t('الإعدادات','Settings')]];
+    let admTimer=null;   // auto-refresh interval for the active-now list (analytics tab)
+    const TABS=[['overview',t('نظرة عامة','Overview')],['analytics',t('التحليلات','Analytics')],['users',t('المستخدمون','Users')],['profiles',t('البروفايلات','Profiles')],
+      ['blogs',t('المدونات','Blogs')],['payments',t('المدفوعات','Payments')],['referrals',t('الدعوات','Referrals')],['notify',t('الإشعارات','Notifications')],['maintenance',t('الصيانة','Maintenance')],['config',t('الإعدادات','Settings')]];
+    const TAB_IC = {
+      overview:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+      analytics:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M8 16v-4M12 16V8M16 16v-6"/></svg>',
+      users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M16 6.2A3 3 0 0 1 16 12M20.5 19c0-2.3-1.4-4-3.5-4.6"/></svg>',
+      profiles:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="10" r="2.2"/><path d="M5 17c.5-1.8 2-2.8 3.5-2.8s3 1 3.5 2.8"/><path d="M14.5 9h4M14.5 13h4"/></svg>',
+      blogs:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/><path d="M9 12h6M9 16h6"/></svg>',
+      payments:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><path d="M6 15h4"/></svg>',
+      referrals:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="5" rx="1.5"/><path d="M5 13v8h14v-8M12 8v13"/><path d="M12 8S10.5 3.5 8 4.5 9 8 12 8ZM12 8s1.5-4.5 4-3.5S15 8 12 8Z"/></svg>',
+      notify:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>',
+      maintenance:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.2 5.2L3 18l3 3 6.5-6.5a4 4 0 0 0 5.2-5.2l-2.7 2.7-2.3-.6-.6-2.3Z"/></svg>',
+      config:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>'
+    };
     const shell=(inner)=> appbar('admin') + `<div class="wrap adm-wrap">
-      <div class="mp-head"><div><h2>${t('لوحة تحكّم الأدمن','Admin Dashboard')}</h2>
-        <div class="sub">${t('راقب وتحكّم في الموقع بالكامل — المستخدمون، المحتوى، الاشتراكات، والإشعارات.','Monitor and control the whole site — users, content, subscriptions, and notifications.')}</div></div></div>
-      <div class="adm-tabs">${TABS.map(t=>`<button class="adm-tab ${TAB_ID===t[0]?'on':''}" data-tab="${t[0]}">${t[1]}</button>`).join('')}</div>
+      <header class="adm-head">
+        <div class="adm-head-main">
+          <span class="adm-badge-pill">${t('لوحة التحكّم','Control Panel')}</span>
+          <h2>${t('لوحة تحكّم الأدمن','Admin Dashboard')}</h2>
+          <div class="sub">${t('راقب وتحكّم في الموقع بالكامل — المستخدمون، المحتوى، الاشتراكات، والإشعارات.','Monitor and control the whole site — users, content, subscriptions, and notifications.')}</div>
+        </div>
+        <div class="adm-head-user">${userAvatar('avatar-sm adm-head-av')}<div class="adm-head-id"><b>${esc(currentUser.username||t('الأدمن','Admin'))}</b><span>${esc(currentUser.email||'')}</span></div></div>
+      </header>
+      <nav class="adm-tabs">${TABS.map(tb=>`<button class="adm-tab ${TAB_ID===tb[0]?'on':''}" data-tab="${tb[0]}"><span class="adm-tab-ic">${TAB_IC[tb[0]]||''}</span><span class="adm-tab-lb">${tb[1]}</span></button>`).join('')}</nav>
       <div class="adm-body" id="admBody">${inner}</div>
     </div>` + drawer('admin');
     const busy = ()=>`<div class="pm-note" style="text-align:center;padding:34px 0">${t('جارٍ التحميل…','Loading…')}</div>`;
@@ -3450,19 +3657,154 @@ const auth = getAuth(app);
       renderTab();
     }
     async function renderTab(){
+      if(admTimer){ clearInterval(admTimer); admTimer=null; }   // stop any tab's auto-refresh
       const el=bodyEl(); if(!el) return; el.innerHTML=busy();
       try{
         if(TAB_ID==='overview')      await renderOverview(el);
+        else if(TAB_ID==='analytics') await renderAnalytics(el);
         else if(TAB_ID==='users')    await renderUsers(el);
         else if(TAB_ID==='profiles') await renderProfiles(el);
         else if(TAB_ID==='blogs')    await renderBlogs(el);
         else if(TAB_ID==='payments') await renderPayments(el);
+        else if(TAB_ID==='referrals') await renderReferrals(el);
         else if(TAB_ID==='notify')   await renderNotify(el);
+        else if(TAB_ID==='maintenance') await renderMaintTab(el);
         else if(TAB_ID==='config'){  el.innerHTML=setupCard(); wireSetup(); }
         wireTabLinks(el);
       }catch(e){ console.error(e); el.innerHTML=`<div class="mp-empty">${t('تعذّر التحميل — تأكد أنك داخل بحساب الأدمن (Google) وأن قواعد قاعدة البيانات المحدّثة منشورة.','Failed to load — make sure you are signed in with the admin account (Google) and the updated database rules are published.')}</div>`; }
     }
     const wireTabLinks = el=>el.querySelectorAll('[data-goto]').forEach(b=>b.onclick=()=>setTab(b.dataset.goto));
+
+    /* ----- Maintenance ----- */
+    async function renderMaintTab(el){
+      const cfg = await loadMaintenance() || {};
+      const row=(key,label,danger)=>`<label class="mnt-row" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--stroke)">
+          <span style="${danger?'font-weight:700':''}">${label}</span>
+          <input type="checkbox" data-mnt="${key}" ${cfg[key]?'checked':''} style="width:20px;height:20px;flex:0 0 auto;accent-color:var(--gold);cursor:pointer"/>
+        </label>`;
+      el.innerHTML = `<div class="panel" style="max-width:600px;margin:0 auto;padding:20px">
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">🛠️ ${t('وضع الصيانة','Maintenance mode')}</h3>
+        <div class="sub" style="margin-bottom:14px">${t('فعّل الصيانة على الموقع كله أو على قسم بعينه. الزوّار يرون صفحة صيانة، وأنت (الأدمن) تدخل عادي.','Enable maintenance for the whole site or a specific section. Visitors see a maintenance page; you (the admin) still get in normally.')}</div>
+        ${row('site','🔴 '+t('إغلاق الموقع بالكامل','Close the whole site'),true)}
+        ${row('explore',t('قسم الاستكشاف','Explore section'))}
+        ${row('profiles',t('قسم البروفايلات (العرض والإنشاء)','Profiles section (view & create)'))}
+        ${row('blogs',t('قسم المدونات (العرض والإنشاء)','Blogs section (view & create)'))}
+        ${row('premium',t('قسم البريميوم','Premium section'))}
+        <div class="field" style="margin-top:14px"><label>${t('رسالة الصيانة (اختياري)','Maintenance message (optional)')}</label><input id="mntMsg" value="${esc(cfg.msg||'')}" placeholder="${t('نعتذر، الموقع تحت الصيانة…','Sorry, the site is under maintenance…')}"/></div>
+        <button class="btn primary" id="mntSave" style="width:100%;margin-top:6px">${t('حفظ إعدادات الصيانة','Save maintenance settings')}</button>
+        <div class="pm-note" id="mntNote"></div>
+      </div>`;
+      const sv=$('#mntSave');
+      if(sv) sv.onclick=async()=>{
+        const out={};
+        el.querySelectorAll('[data-mnt]').forEach(c=>{ if(c.checked) out[c.dataset.mnt]=true; });
+        const m=($('#mntMsg').value||'').trim(); if(m) out.msg=m.slice(0,400);
+        const note=$('#mntNote'); sv.disabled=true; const old=sv.textContent; sv.textContent=t('جارٍ الحفظ…','Saving…');
+        try{ await set(ref(db,'config/maintenance'), out); maintCfg=out;
+          try{ sessionStorage.setItem(MAINT_KEY, JSON.stringify(out)); }catch(e){}
+          note.className='pm-note ok'; note.textContent=t('تم حفظ إعدادات الصيانة ✓','Maintenance settings saved ✓');
+        }catch(e){ console.error(e); note.className='pm-note'; note.textContent=t('تعذّر الحفظ — تأكد أنك أدمن (Google) وأن القواعد المحدّثة منشورة','Failed to save — make sure you are the admin (Google) and the updated rules are published'); }
+        sv.disabled=false; sv.textContent=old;
+      };
+    }
+
+    /* ----- Analytics ----- */
+    async function renderAnalytics(el){
+      let a={};
+      try{ const s=await get(child(ref(db),'analytics')); if(s.exists()) a=s.val()||{}; }catch(e){}
+      const total=a.total||0, daily=a.daily||{}, countries=a.countries||{};
+      const p2=n=>(n<10?'0':'')+n, keyOf=dt=>dt.getFullYear()+'-'+p2(dt.getMonth()+1)+'-'+p2(dt.getDate());
+      const today=daily[keyOf(new Date())]||0;
+      const days=[]; { const base=Date.now(); for(let i=13;i>=0;i--){ const dd=new Date(base-i*86400000); const k=keyOf(dd); days.push([k, daily[k]||0]); } }
+      const maxD=Math.max(1,...days.map(x=>x[1]));
+      const bars=days.map(x=>`<div title="${x[0]}: ${x[1]}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px">
+          <div style="width:100%;background:var(--gold);border-radius:3px 3px 0 0;height:${Math.round(x[1]/maxD*90)+2}px"></div>
+          <span style="font-size:9px;opacity:.6">${x[0].slice(5)}</span>
+        </div>`).join('');
+      const cList=Object.entries(countries).sort((m,n)=>n[1]-m[1]);
+      const maxC=Math.max(1,...cList.map(x=>x[1]));
+      const flag=cc=>/^[A-Z]{2}$/.test(cc)?cc.replace(/./g,c=>String.fromCodePoint(127397+c.charCodeAt(0))):'🌐';
+      const cRows=cList.length?cList.map(x=>`<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+          <span style="width:52px">${flag(x[0])} ${esc(x[0])}</span>
+          <div style="flex:1;background:var(--stroke);border-radius:6px;overflow:hidden;height:10px"><div style="height:100%;width:${Math.round(x[1]/maxC*100)}%;background:var(--gold)"></div></div>
+          <b style="width:44px;text-align:end">${x[1]}</b>
+        </div>`).join(''):`<div class="pm-note">${t('لا توجد بيانات دول بعد','No country data yet')}</div>`;
+      const stat=(v,l)=>`<div class="panel" style="flex:1;min-width:130px;text-align:center;padding:16px"><div style="font-size:28px;font-weight:800;color:var(--gold)">${v}</div><div class="sub">${l}</div></div>`;
+      el.innerHTML=`
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+          ${stat(total,t('إجمالي الزيارات','Total visits'))}
+          ${stat(today,t('زيارات اليوم','Today'))}
+          ${stat('<span id="anaActive">…</span>',t('نشطون الآن','Active now'))}
+        </div>
+        <div class="panel" style="padding:18px;margin-bottom:16px">
+          <h3 style="font-family:'Cormorant Garamond',serif;font-size:18px;margin-bottom:12px">${t('الزيارات — آخر ١٤ يوماً','Visits — last 14 days')}</h3>
+          <div style="display:flex;align-items:flex-end;gap:4px;height:120px">${bars}</div>
+        </div>
+        <div class="panel" style="padding:18px;margin-bottom:16px">
+          <h3 style="font-family:'Cormorant Garamond',serif;font-size:18px;margin-bottom:12px">${t('من أين يدخلون','Where they come from')}</h3>
+          ${cRows}
+        </div>
+        <div class="panel" style="padding:18px">
+          <h3 style="font-family:'Cormorant Garamond',serif;font-size:18px;margin-bottom:12px">${t('المتصلون الآن','Online now')}</h3>
+          <div id="anaOnline"><div class="pm-note">${t('جارٍ التحميل…','Loading…')}</div></div>
+        </div>`;
+      const refreshOnline=async()=>{
+        let pres={};
+        try{ const s=await get(child(ref(db),'presence')); if(s.exists()) pres=s.val()||{}; }catch(e){}
+        const now=Date.now(); const live=Object.values(pres).filter(pp=>pp&&pp.at&&(now-pp.at)<120000);
+        const act=$('#anaActive'); if(act) act.textContent=live.length;
+        const box=$('#anaOnline'); if(box){
+          box.innerHTML = live.length
+            ? live.sort((m,n)=>n.at-m.at).map(pp=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--stroke)">
+                <span>${esc(pp.name||t('زائر','Visitor'))}</span><span class="sub" style="font-size:12px">${esc(pp.page||'')}</span></div>`).join('')
+            : `<div class="pm-note">${t('لا أحد متصل الآن','No one online right now')}</div>`;
+        }
+      };
+      await refreshOnline();
+      admTimer=setInterval(refreshOnline, 15000);
+    }
+
+    /* ----- Referrals ----- */
+    async function grantReferralPremium(uid, done){
+      try{
+        const cur=await getPremium(uid);
+        const base=(cur && premiumActive(cur) && cur.expires)?cur.expires:Date.now();
+        const expires=base + 24*3600*1000;   // +1 day
+        const count=((cur && cur.count)?cur.count:0)+1;
+        await set(ref(db,'premium/'+uid), { active:true, plan:'referral', since:(cur&&cur.since)||Date.now(), expires, count });
+        await set(ref(db,'referralRewards/'+uid), { at:Date.now() });
+        toast(t('تم منح بريميوم يوم ✓','1-day premium granted ✓')); done&&done();
+      }catch(e){ console.error(e); toast(t('تعذّر — تأكد أنك داخل بحساب الأدمن (Google)','Failed — make sure you are signed in with the admin account (Google)')); }
+    }
+    async function renderReferrals(el){
+      const goal=10;
+      let refs={}, rewards={}, users={};
+      try{ const s=await get(child(ref(db),'referrals')); if(s.exists()) refs=s.val()||{}; }catch(e){}
+      try{ const s=await get(child(ref(db),'referralRewards')); if(s.exists()) rewards=s.val()||{}; }catch(e){}
+      try{ const s=await get(child(ref(db),'users')); if(s.exists()) users=s.val()||{}; }catch(e){}
+      const rows=Object.entries(refs).map(([ruid,kids])=>({uid:ruid,count:Object.keys(kids||{}).length}))
+        .filter(r=>r.count>0).sort((m,n)=>n.count-m.count);
+      const nameOf=uid=>{ const u=users[uid]; return u?(u.username||u.email||uid):uid; };
+      const eligible=rows.filter(r=>r.count>=goal && !rewards[r.uid]);
+      const card=(inner,title)=>`<div class="panel" style="padding:18px;margin-bottom:16px"><h3 style="font-family:'Cormorant Garamond',serif;font-size:18px;margin-bottom:12px">${title}</h3>${inner}</div>`;
+      const eligHtml = eligible.length
+        ? eligible.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--stroke)">
+            <span><b>${esc(nameOf(r.uid))}</b> <span class="sub">— ${r.count} ${t('دعوة','referrals')}</span></span>
+            <button class="btn primary" data-grant-ref="${esc(r.uid)}" style="flex:0 0 auto;padding:7px 14px">${t('منح بريميوم يوم','Grant 1-day premium')}</button>
+          </div>`).join('')
+        : `<div class="pm-note">${t('لا أحد مؤهَّل للمكافأة الآن','No one is eligible for a reward right now')}</div>`;
+      const allHtml = rows.length
+        ? rows.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--stroke)">
+            <span>${esc(nameOf(r.uid))}</span>
+            <span class="sub">${r.count}/${goal}${rewards[r.uid]?' · '+t('كوفئ ✓','rewarded ✓'):''}</span>
+          </div>`).join('')
+        : `<div class="pm-note">${t('لا توجد دعوات بعد','No referrals yet')}</div>`;
+      el.innerHTML = card(eligHtml,'🎁 '+t('مكافآت بانتظار الموافقة','Rewards awaiting approval')) + card(allHtml,t('كل الدعوات','All referrals'));
+      el.querySelectorAll('[data-grant-ref]').forEach(b=>b.onclick=()=>{
+        if(confirm(t('منح هذا العضو بريميوم ليوم واحد؟','Grant this member 1 day of premium?')))
+          grantReferralPremium(b.dataset.grantRef, ()=>renderReferrals(el));
+      });
+    }
 
     /* ----- Overview ----- */
     async function renderOverview(el){
@@ -3684,11 +4026,11 @@ const auth = getAuth(app);
       if(!email){ toast(t('هذا المستخدم بلا بريد','This user has no email')); return; }
       const title=prompt(t('عنوان الإشعار:','Notification title:')); if(title===null||!title.trim()) return;
       const body=(prompt(t('نص الإشعار (اختياري):','Notification text (optional):'))||'').trim();
-      const t=title.trim();
+      const ttl=title.trim();
       emailToUid(email.toLowerCase()).then(uid=>{ const id=shortId(14);
-        set(ref(db,'announcements/'+id),{ title:t.slice(0,140), body:body.slice(0,1000), uid:uid||'all', by:(currentUser.email||'admin'), createdAt:Date.now() }).catch(()=>{});
+        set(ref(db,'announcements/'+id),{ title:ttl.slice(0,140), body:body.slice(0,1000), uid:uid||'all', by:(currentUser.email||'admin'), createdAt:Date.now() }).catch(()=>{});
       });
-      sendUserEmail(email,t,body,name).then(ok=>toast(ok?(curLang()==='en'?'Notification and email sent ✓':'تم إرسال الإشعار والبريد ✓'):(curLang()==='en'?'Notification published (enable EmailJS for email)':'تم نشر الإشعار (فعّل EmailJS للبريد)')));
+      sendUserEmail(email,ttl,body,name).then(ok=>toast(ok?(curLang()==='en'?'Notification and email sent ✓':'تم إرسال الإشعار والبريد ✓'):(curLang()==='en'?'Notification published (enable EmailJS for email)':'تم نشر الإشعار (فعّل EmailJS للبريد)')));
     }
 
     $('#app').innerHTML = shell(busy()); wireAppbar(); wireTabs();
@@ -3724,7 +4066,8 @@ const auth = getAuth(app);
         showAuth('login'); return;
       case 'account':     needLogin(showAccount); return;
       case 'premium':     needLogin(showPremium); return;
-      case 'admin':       needLogin(showAdmin); return;
+      case 'admin':       showAdmin(); return;   // showAdmin() shows a blank 404 to any non-admin (incl. logged-out)
+      case 'hub':         needLogin(showHub); return;
       case 'my-profiles': needLogin(showMyProfiles); return;
       case 'my-blog':     needLogin(showBlogAdmin); return;
       case 'new-profile': needLogin(()=> q('edit')?startEdit(q('edit')):newProfile()); return;
@@ -3734,9 +4077,146 @@ const auth = getAuth(app);
         if(currentUser) showMyProfiles(); else showAuth('login');
     }
   }
+  /* ---------- referral invite popup (share link → 1-day premium) ---------- */
+  function closeReferral(){ const o=$('#refOv'); if(o) o.remove(); }
+  async function openReferral(auto){
+    if(!currentUser){ gotoLogin(); return; }
+    closeReferral();
+    const goal=10;
+    const link=ROOT+'?ref='+currentUser.uid;
+    const introTxt=t('شارك رابطك — وبعد دخول '+goal+' مستخدمين منه تحصل على بريميوم يوماً كاملاً (بعد مراجعة الأدمن).','Share your link — after '+goal+' users join through it you get a full day of Premium (after admin review).');
+    const shareMsg=t('انضم إلى elgoharyX عبر رابطي: ','Join elgoharyX via my link: ')+link;
+    const ov=document.createElement('div');
+    ov.id='refOv';
+    ov.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:18px';
+    ov.innerHTML=`<div class="ref-card" style="background:var(--panel,#fff);color:var(--txt,#111);max-width:440px;width:100%;border-radius:18px;padding:24px 22px;box-shadow:0 20px 60px rgba(0,0,0,.45);position:relative;border:1px solid var(--line,rgba(0,0,0,.1))">
+      <button id="refClose" title="${t('إغلاق','Close')}" style="position:absolute;top:12px;inset-inline-end:12px;background:none;border:none;font-size:22px;cursor:pointer;color:inherit;line-height:1">✕</button>
+      <div style="font-size:36px;text-align:center">🎁</div>
+      <h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;text-align:center;margin:6px 0 6px">${t('ادعُ أصدقاءك واربح بريميوم','Invite friends, earn Premium')}</h3>
+      <p class="sub" style="text-align:center;margin-bottom:14px">${esc(introTxt)}</p>
+      <div id="refProgress" class="sub" style="text-align:center;margin-bottom:14px">${t('جارٍ التحميل…','Loading…')}</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="refLink" value="${esc(link)}" readonly dir="ltr" style="flex:1;min-width:0;font-family:monospace;font-size:12px"/>
+        <button class="btn primary" id="refCopy" style="flex:0 0 auto">${t('نسخ','Copy')}</button>
+      </div>
+      <a class="btn ghost" href="https://wa.me/?text=${encodeURIComponent(shareMsg)}" target="_blank" rel="noopener" style="width:100%;display:block;text-align:center;margin-bottom:10px">${t('مشاركة عبر واتساب','Share on WhatsApp')}</a>
+      ${auto?`<label style="display:flex;align-items:center;gap:8px;justify-content:center;font-size:13px;opacity:.85;cursor:pointer"><input type="checkbox" id="refHide"/> ${t('لا تُظهر هذه الرسالة مرة أخرى','Don\'t show this again')}</label>`:''}
+    </div>`;
+    document.body.appendChild(ov);
+    const close=()=>{ if(auto){ const h=$('#refHide'); if(h&&h.checked){ try{ localStorage.setItem('apb_ref_hide','1'); }catch(e){} } } closeReferral(); };
+    $('#refClose').onclick=close;
+    ov.onclick=e=>{ if(e.target===ov) close(); };
+    $('#refCopy').onclick=()=>{ const i=$('#refLink'); try{ navigator.clipboard.writeText(link); }catch(e){ try{ i.select(); document.execCommand('copy'); }catch(_){} } toast(t('تم نسخ الرابط ✓','Link copied ✓')); };
+    try{
+      const n=await referralCount(currentUser.uid);
+      const el=$('#refProgress');
+      if(el){
+        el.innerHTML = n>=goal
+          ? '<b style="color:var(--gold)">'+t('🎉 وصلت '+n+' — بانتظار موافقة الأدمن على مكافأتك','🎉 '+n+' reached — awaiting admin approval of your reward')+'</b>'
+          : t('دخل <b>'+n+'</b> من <b>'+goal+'</b> مستخدمين','<b>'+n+'</b> of <b>'+goal+'</b> users joined');
+      }
+    }catch(e){}
+  }
+
+  /* ---------- maintenance mode (admin-controlled) ----------
+     config/maintenance = { site:bool, explore:bool, profiles:bool, blogs:bool,
+     premium:bool, msg:string }. When a section (or the whole site) is on, every
+     visitor to it sees a maintenance page — except the admin, who always passes. */
+  let maintCfg=null;
+  const MAINT_KEY='apb_maint';   // session cache — read the DB once per session, later pages are instant
+  async function loadMaintenance(){
+    try{ const c=sessionStorage.getItem(MAINT_KEY); if(c!==null){ maintCfg=JSON.parse(c)||{}; return maintCfg; } }catch(e){}
+    // fail-open with a timeout: never let a slow/failed read block the whole page render
+    try{
+      const s=await Promise.race([
+        get(child(ref(db),'config/maintenance')),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('maint-timeout')), 4000))
+      ]);
+      maintCfg = s.exists()? (s.val()||{}) : {};
+    }catch(e){ maintCfg = {}; }
+    try{ sessionStorage.setItem(MAINT_KEY, JSON.stringify(maintCfg)); }catch(e){}
+    return maintCfg;
+  }
+  const MAINT_SECTION = {
+    'explore':'explore',
+    'view-profile':'profiles','new-profile':'profiles','my-profiles':'profiles',
+    'view-blog':'blogs','new-blog':'blogs','my-blog':'blogs',
+    'premium':'premium'
+  };
+  function maintOn(){
+    if(!maintCfg) return false;
+    if(maintCfg.site) return true;
+    const sec = MAINT_SECTION[PAGE];
+    return !!(sec && maintCfg[sec]);
+  }
+  function showMaintenancePage(){
+    document.title=t('صيانة — elgoharyX','Maintenance — elgoharyX');
+    try{ document.body.style.background=''; }catch(e){}
+    const msg=(maintCfg && maintCfg.msg) ? maintCfg.msg : t('نُجري بعض التحسينات على الموقع الآن. من فضلك عُد بعد قليل — نعتذر عن الإزعاج.','We are making some improvements right now. Please check back shortly — sorry for the inconvenience.');
+    const app=document.getElementById('app'); if(!app) return;
+    app.innerHTML=`<div class="err-wrap"><div class="err-card">
+      <img class="err-logo" src="${LOGO}" alt="elgoharyX"/>
+      <div class="err-code">🛠️</div>
+      <span class="err-tag"><i></i>${t('صيانة · MAINTENANCE','Maintenance · MAINTENANCE')}</span>
+      <h2 class="err-title">${t('الموقع تحت الصيانة','Under maintenance')}</h2>
+      <p class="err-msg">${esc(msg)}</p>
+      <div class="err-actions"><button class="btn ghost" onclick="location.reload()">${t('إعادة المحاولة','Try again')}</button></div>
+    </div></div>`;
+  }
+  /* which sections (or the whole site) are currently under maintenance */
+  function maintActiveList(){
+    if(!maintCfg) return [];
+    if(maintCfg.site) return [t('الموقع كله','the whole site')];
+    const on=[];
+    if(maintCfg.explore)  on.push(t('الاستكشاف','Explore'));
+    if(maintCfg.profiles) on.push(t('البروفايلات','Profiles'));
+    if(maintCfg.blogs)    on.push(t('المدونات','Blogs'));
+    if(maintCfg.premium)  on.push(t('البريميوم','Premium'));
+    return on;
+  }
+  /* admin-only banner so the admin can SEE maintenance is active (they bypass the block) */
+  function showAdminMaintBanner(){
+    const ex=document.getElementById('maintBanner'); if(ex) ex.remove();
+    if(!isAdmin()) return;
+    const on=maintActiveList(); if(!on.length) return;
+    const b=document.createElement('div'); b.id='maintBanner';
+    // sticky strip at the very top of the flow → takes its own space, never overlaps the app bar
+    b.style.cssText='position:sticky;top:0;z-index:10000;background:#b91c1c;color:#fff;padding:7px 14px;text-align:center;font-size:12.5px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.25)';
+    b.textContent='🛠️ '+t('وضع الصيانة مفعّل على: ','Maintenance active on: ')+on.join('، ')+' — '+t('الزوّار يرون صفحة الصيانة (أنت تتخطاها كأدمن)','visitors see the maintenance page (you bypass it as admin)');
+    document.body.insertBefore(b, document.body.firstChild);
+  }
+  /* route() wrapped with the maintenance gate — used by init() on every page load */
+  async function routeGuarded(){
+    if(maintCfg===null) await loadMaintenance();
+    const anyMaint = maintActiveList().length>0;
+    if(anyMaint && adminEmail===undefined) await loadAdminEmail();   // load so the admin can bypass + see the banner
+    if(maintOn() && !isAdmin()){ showMaintenancePage(); return; }
+    route();
+    showAdminMaintBanner();
+  }
+  /* site telemetry + growth — runs once currentUser is resolved (or anonymously):
+     log the visit, mark live presence, record any pending referral, maybe pop the invite. */
+  function beginTracking(){
+    try{
+      const u=currentUser;
+      logVisit();
+      startPresence({ uid: u&&u.uid, name: u&&u.username, page: PAGE||'home' });
+      if(u&&u.uid){ recordReferralIfPending(u.uid); maybeReferralPopup(); }
+    }catch(e){}
+  }
+  function maybeReferralPopup(){
+    try{
+      if(!currentUser || isPremium()) return;
+      if(localStorage.getItem('apb_ref_hide')==='1') return;
+      if(sessionStorage.getItem('apb_ref_popup')==='1') return;
+      sessionStorage.setItem('apb_ref_popup','1');
+      setTimeout(()=>{ try{ openReferral(true); }catch(e){} }, 1600);
+    }catch(e){}
+  }
   (async function init(){
+    captureReferral();                                 // remember ?ref=… before anything else
     const uid=getSession();
-    if(!uid){ route(); return; }
+    if(!uid){ await routeGuarded(); beginTracking(); return; }
     loadAdminEmail();                                  // session-cached: reads the DB only on the first page of a session
     // refresh premium status in the background & cache it for the NEXT navigation only —
     // we never flip the gate mid-view, so the current page stays fully consistent.
@@ -3745,7 +4225,7 @@ const auth = getAuth(app);
     const cached=getCachedUser();
     if(cached && cached.uid===uid){
       // instant render from the local cache — no database read needed
-      currentUser=cached; route();
+      currentUser=cached; await routeGuarded(); beginTracking();
       // touch the database at most ONCE per browser session; later pages use the cache
       if(!refreshed){
         try{ sessionStorage.setItem(REFRESH_KEY,'1'); }catch(e){}
@@ -3761,5 +4241,5 @@ const auth = getAuth(app);
     let rec=null;
     try{ rec=await Promise.race([loadUserRecord(uid), new Promise(r=>setTimeout(()=>r(null),8000))]); }catch(e){}
     if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||t('مستخدم','User'), photo:rec.photo||''}; cacheUser(currentUser); }
-    route(); applyPrem();
+    await routeGuarded(); beginTracking(); applyPrem();
   })();
