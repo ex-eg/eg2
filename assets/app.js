@@ -151,7 +151,9 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
   const imgStyle=d=>`object-position:${posSafe(d.photoPos)};transform:scale(${zoomSafe(d.photoZoom)})`;
   function pfAvatar(d){
     const photo = d.photo ? `<img src="${esc(d.photo)}" alt="${esc(d.name)}" style="${imgStyle(d)}" onerror="this.remove()"/>` : esc(initials(d.name));
-    return `<div class="pf-avatar">${photo}</div>`;
+    const fr = (d.frame && /^[a-z0-9]{1,16}$/i.test(d.frame) && d.frame!=='none') ? ' pf-fr pf-fr-'+d.frame : '';
+    const lvl = (d.elgLevel && +d.elgLevel>1) ? `<span class="pf-lvl" title="${t('مستوى النشاط','Activity level')}">${t('مستوى','Lv')} ${parseInt(d.elgLevel,10)}</span>` : '';
+    return `<div class="pf-avatar${fr}">${photo}${lvl}</div>`;
   }
   function pfWho(d){
     const nameEn = d.nameEn?`<span class="en">${esc(d.nameEn)}</span>`:'';
@@ -430,8 +432,17 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
   /* ======================================================================
      BUILDER
      ====================================================================== */
+  const FRAMES = [
+    {id:'none',   name:t('بلا إطار','No frame'), pro:false},
+    {id:'gold',   name:t('ذهبي','Gold'),         pro:false},
+    {id:'grad',   name:t('متدرّج','Gradient'),    pro:false},
+    {id:'glow',   name:t('توهّج','Glow'),         pro:true},
+    {id:'double', name:t('مزدوج','Double'),       pro:true},
+    {id:'neon',   name:t('نيون','Neon'),          pro:true},
+    {id:'dashed', name:t('منقّط','Dashed'),        pro:true}
+  ];
   const DEFAULTS = {
-    template:'royal', layout:'classic',
+    template:'royal', layout:'classic', frame:'none',
     kicker:t('أستاذ دكتور · Professor','Professor'),
     name:'Prof. Dr. Mona El-Fiky', nameEn:'',
     role:t('أستاذ بقسم هندسة الحاسبات والذكاء الاصطناعي — كلية الهندسة، جامعة القاهرة.','Professor of Computer Engineering and Artificial Intelligence — Faculty of Engineering, Cairo University.'),
@@ -1270,22 +1281,31 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
         <details class="acc">
           <summary><span class="sum-t">${UICON.grid} ${t('التخطيط / الشكل','Layout / Style')} <span style="color:var(--muted-2);font-weight:400">(${LAYOUTS.length})</span></span></summary>
           <div class="acc-body">
-            ${isPremium()?'':gateNote(t('أول '+FREE_PROFILE_LAYOUTS+' تخطيطاً مجانية — والباقي للمشتركين المميزين.','The first '+FREE_PROFILE_LAYOUTS+' layouts are free — the rest are for Premium members.'))}
+            ${canDesign()?'':gateNote(t('أول '+FREE_PROFILE_LAYOUTS+' تخطيطاً مجانية — والباقي للمشتركين المميزين.','The first '+FREE_PROFILE_LAYOUTS+' layouts are free — the rest are for Premium members.'))}
             <input id="laySearch" class="lay-search" placeholder="${t('ابحث عن تخطيط…','Search for a layout…')}"/>
             <div class="layouts" id="lays">
-              ${LAYOUTS.map((l,li)=>{ const lk=li>=FREE_PROFILE_LAYOUTS; return `<div class="lay ${l.id===state.layout?'active':''} ${lk?'locked':''}" data-lay="${l.id}" data-name="${esc(l.name)}" ${lk?'data-locked="1"':''}>
+              ${LAYOUTS.map((l,li)=>{ const lk=li>=FREE_PROFILE_LAYOUTS && !canDesign(); return `<div class="lay ${l.id===state.layout?'active':''} ${lk?'locked':''}" data-lay="${l.id}" data-name="${esc(l.name)}" ${lk?'data-locked="1"':''}>
                 ${lk?'<span class="lay-lock">'+LOCKICON+'</span>':''}${l.icon}<div class="ln">${esc(l.name)}</div>${l.desc?`<div class="ld">${esc(l.desc)}</div>`:''}</div>`; }).join('')}
             </div>
           </div>
         </details>
 
         <details class="acc">
-          <summary><span class="sum-t">${UICON.palette} ${t('لون التصميم','Design color')} <span style="color:var(--muted-2);font-weight:400">(${TEMPLATES.length})</span> ${isPremium()?'':'<span class="lock-chip">'+LOCKICON+' '+t('مميز','Premium')+'</span>'}</span></summary>
+          <summary><span class="sum-t">${UICON.palette} ${t('لون التصميم','Design color')} <span style="color:var(--muted-2);font-weight:400">(${TEMPLATES.length})</span> ${canDesign()?'':'<span class="lock-chip">'+LOCKICON+' '+t('مميز','Premium')+'</span>'}</span></summary>
           <div class="acc-body">
-            ${isPremium()?'':gateNote(t('أول '+FREE_PROFILE_COLORS+' لوناً مجانية — وباقي الألوان للمشتركين المميزين.','The first '+FREE_PROFILE_COLORS+' colors are free — the rest are for Premium members.'))}
+            ${canDesign()?'':gateNote(t('أول '+FREE_PROFILE_COLORS+' لوناً مجانية — وباقي الألوان للمشتركين المميزين.','The first '+FREE_PROFILE_COLORS+' colors are free — the rest are for Premium members.'))}
             <div class="templates" id="tpls">
-              ${TEMPLATES.map((t,ti)=>{ const lk=ti>=FREE_PROFILE_COLORS; return `<div class="tpl t-${t.id} ${t.id===state.template?'active':''} ${lk?'locked':''}" data-tpl="${t.id}" ${lk?'data-locked="1"':''}>
+              ${TEMPLATES.map((t,ti)=>{ const lk=ti>=FREE_PROFILE_COLORS && !canDesign(); return `<div class="tpl t-${t.id} ${t.id===state.template?'active':''} ${lk?'locked':''}" data-tpl="${t.id}" ${lk?'data-locked="1"':''}>
                 <div class="swatch">${lk?'<span class="tpl-lock">'+LOCKICON+'</span>':''}</div><div class="nm">${t.name}</div></div>`; }).join('')}
+            </div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="sum-t">${UICON.person} ${t('إطار الصورة','Avatar frame')} <span style="color:var(--muted-2);font-weight:400">(${FRAMES.length})</span></span></summary>
+          <div class="acc-body">
+            <div class="frames-row" id="framesRow">
+              ${FRAMES.map(f=>{ const lk=f.pro && !canDesign(); return `<div class="frm ${f.id===state.frame?'active':''} ${lk?'locked':''}" data-frm="${f.id}" ${lk?'data-locked="1"':''}><div class="frm-prev pf-fr-${f.id}"><span>${esc(initials(state.name||'A'))}</span></div><div class="frm-n">${esc(f.name)}${lk?' '+LOCKICON:''}</div></div>`; }).join('')}
             </div>
           </div>
         </details>
@@ -1577,7 +1597,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
     // layout picker (locked layouts need a subscription)
     $('#lays').querySelectorAll('.lay').forEach(l=>{
       l.onclick=()=>{
-        if(l.dataset.locked && !isPremium()){ toast(t('هذا التخطيط للمشتركين المميزين ✦','This layout is for Premium members ✦')); return; }
+        if(l.dataset.locked && !canDesign()){ toast(t('هذا التخطيط للمشتركين المميزين ✦','This layout is for Premium members ✦')); return; }
         state.layout=l.dataset.lay;
         $('#lays').querySelectorAll('.lay').forEach(x=>x.classList.toggle('active',x===l));
         paint();
@@ -1589,9 +1609,20 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
     // color template picker (locked colors need a subscription)
     $('#tpls').querySelectorAll('.tpl').forEach(t=>{
       t.onclick=()=>{
-        if(t.dataset.locked && !isPremium()){ toast(curLang()==='en'?'This color is for Premium members ✦':'هذا اللون للمشتركين المميزين ✦'); return; }
+        if(t.dataset.locked && !canDesign()){ toast(curLang()==='en'?'This color is for Premium members ✦':'هذا اللون للمشتركين المميزين ✦'); return; }
         state.template=t.dataset.tpl;
         $('#tpls').querySelectorAll('.tpl').forEach(x=>x.classList.toggle('active',x===t));
+        paint();
+      };
+    });
+
+    // avatar frame picker (some frames are premium / coin-unlocked)
+    const framesRow=$('#framesRow');
+    if(framesRow) framesRow.querySelectorAll('.frm').forEach(f=>{
+      f.onclick=()=>{
+        if(f.dataset.locked && !canDesign()){ toast(t('هذا الإطار مميّز ✦ — افتحه من متجر المكافآت','This frame is Premium ✦ — unlock it from the Rewards store')); return; }
+        state.frame=f.dataset.frm;
+        framesRow.querySelectorAll('.frm').forEach(x=>x.classList.toggle('active',x===f));
         paint();
       };
     });
@@ -1611,12 +1642,13 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
         const id = editingId || await uniqueShortId();
         // free accounts can't save premium profile features
         if(!isPremium()){
-          const li=LAYOUTS.findIndex(l=>l.id===state.layout); if(li>=FREE_PROFILE_LAYOUTS) state.layout=(LAYOUTS[0]||{}).id||state.layout;
-          const ti=TEMPLATES.findIndex(t=>t.id===state.template); if(ti>=FREE_PROFILE_COLORS) state.template=(TEMPLATES[0]||{}).id||state.template;
+          const li=LAYOUTS.findIndex(l=>l.id===state.layout); if(li>=FREE_PROFILE_LAYOUTS && !canDesign()) state.layout=(LAYOUTS[0]||{}).id||state.layout;
+          const ti=TEMPLATES.findIndex(t=>t.id===state.template); if(ti>=FREE_PROFILE_COLORS && !canDesign()) state.template=(TEMPLATES[0]||{}).id||state.template;
           state.threeD=false; state.anim='none'; if(MOTIONS[0]) state.motion3d=MOTIONS[0].id;
           state.gallery=[]; state.videos=[];
         }
-        const clean = {...state, ownerUid:owner, ownerName, createdAt, updatedAt:Date.now(), viewSalt:null, viewPassHash:null};
+        const elgLevel = (function(){ try{ return parseInt(localStorage.getItem('elg_level'),10)||0; }catch(e){ return 0; } })();
+        const clean = {...state, ownerUid:owner, ownerName, createdAt, updatedAt:Date.now(), viewSalt:null, viewPassHash:null, elgLevel};
         await set(ref(db,'profiles/'+id), clean);
         await set(ref(db,'userProfiles/'+owner+'/'+id), {name:state.name||'بدون اسم', template:state.template, updatedAt:Date.now()});
         // now in edit mode for subsequent saves
@@ -2043,6 +2075,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
         msg:t('تحقّق من اتصالك بالإنترنت أو من قواعد قاعدة البيانات، ثم أعد المحاولة.','Check your internet connection or your database rules, then try again.'), showReload:true});
     }
   }
+  const blogFrameClass = d => (d && d.frame && /^[a-z0-9]{1,16}$/i.test(d.frame) && d.frame!=='none') ? ' blog-fr blog-fr-'+d.frame : '';
   function blogShell(d){
     const dz = blogDesign(d.design);
     document.body.style.background = dz.bg;
@@ -2236,7 +2269,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
     const layout = hasSide
       ? `<div class="blog-layout"><div class="blog-main">${main}</div>${blogSidebar(d,posts)}</div>`
       : main;
-    $('#app').innerHTML = `<div class="blog ${dz.id} bf-${dz.bf} bh-${dz.bh} ${bAnim(d)} ${bTilt(d)}">
+    $('#app').innerHTML = `<div class="blog ${dz.id} bf-${dz.bf} bh-${dz.bh}${blogFrameClass(d)} ${bAnim(d)} ${bTilt(d)}">
       ${blogTop(d,dz)}${blogTicker(d)}${blogHero(d,dz)}
       <div class="blog-wrap">${layout}</div>
       ${foot}</div>`;
@@ -2341,7 +2374,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
     const others = posts.map((x,i)=>({x,i})).filter(o=>o.i!==idx).slice(0,3);
     const more = others.length ? `<div class="art-more"><div class="blog-sec-h"><h3>${t('مقالات أخرى','More Articles')}</h3><span class="rule"></span></div>
       <div class="blog-grid">${others.map(o=>blogPostCard(o.x,o.i)).join('')}</div></div>` : '';
-    $('#app').innerHTML = `<div class="blog ${dz.id} bf-${dz.bf} bh-${dz.bh}">
+    $('#app').innerHTML = `<div class="blog ${dz.id} bf-${dz.bf} bh-${dz.bh}${blogFrameClass(d)}">
       ${blogTop(d,dz)}
       <div class="article-view">
         <button class="art-back">${t('→ العودة إلى المدونة','→ Back to blog')}</button>
@@ -2496,7 +2529,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
   }
 
   /* ---------- blog builder state ---------- */
-  const BLOG_EMPTY = { title:'', subtitle:'', author:'', authorEn:'', about:'', cover:'', logo:'', design:'bd1',
+  const BLOG_EMPTY = { title:'', subtitle:'', author:'', authorEn:'', about:'', cover:'', logo:'', design:'bd1', frame:'none',
     threeD:false, anim:'none', searchStyle:'off', sidebarStyle:'none', tickerStyle:'none', posts:[] };
   const BLOG_SAMPLE = {
     title:t('مدوّنة الفكر والمعرفة','The Thought & Knowledge Blog'), subtitle:t('مقالات في العلم والثقافة والتطوير الذاتي — تُنشر بعناية لتثري عقلك.','Articles on science, culture, and self-development — carefully written to enrich your mind.'),
@@ -2596,11 +2629,20 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
         <details class="acc" open>
           <summary><span class="sum-t">${UICON.palette} ${t('تصميم المدونة','Blog Design')} <span style="color:var(--muted-2);font-weight:400">(${BLOG_DESIGNS.length})</span></span></summary>
           <div class="acc-body">
-            ${isPremium()?'':gateNote(t('أول '+FREE_BLOG_DESIGNS+' تصميماً مجانية — والباقي (حتى 150) للمشتركين المميزين.','The first '+FREE_BLOG_DESIGNS+' designs are free — the rest (up to 150) are for premium subscribers.'))}
+            ${canDesign()?'':gateNote(t('أول '+FREE_BLOG_DESIGNS+' تصميماً مجانية — والباقي (حتى 150) للمشتركين المميزين.','The first '+FREE_BLOG_DESIGNS+' designs are free — the rest (up to 150) are for premium subscribers.'))}
             <input id="bdSearch" class="lay-search" placeholder="${t('ابحث عن تصميم…','Search for a design…')}"/>
             <div class="bd-picker" id="bdPicker">
-              ${BLOG_DESIGNS.map(d=>{ const lk=blogDesignLocked(d.id); return `<div class="bd-swatch ${d.id===s.design?'active':''} ${lk?'locked':''}" data-bd="${d.id}" data-name="${esc(d.name)}" ${lk?'data-locked="1"':''}>
+              ${BLOG_DESIGNS.map(d=>{ const lk=blogDesignLocked(d.id) && !canDesign(); return `<div class="bd-swatch ${d.id===s.design?'active':''} ${lk?'locked':''}" data-bd="${d.id}" data-name="${esc(d.name)}" ${lk?'data-locked="1"':''}>
                 <div class="sw" style="background:linear-gradient(135deg,${d.accent},${d.accent2})">${lk?'<span class="sw-lock">'+LOCKICON+'</span>':''}</div><div class="nm">${esc(d.name)}</div></div>`; }).join('')}
+            </div>
+          </div>
+        </details>
+
+        <details class="acc">
+          <summary><span class="sum-t">${UICON.person} ${t('إطار المدونة','Blog frame')} <span style="color:var(--muted-2);font-weight:400">(${FRAMES.length})</span></span></summary>
+          <div class="acc-body">
+            <div class="frames-row" id="bFramesRow">
+              ${FRAMES.map(f=>{ const lk=f.pro && !canDesign(); return `<div class="frm ${f.id===s.frame?'active':''} ${lk?'locked':''}" data-frm="${f.id}" ${lk?'data-locked="1"':''}><div class="frm-prev blog-frprev blog-fr-${f.id}"></div><div class="frm-n">${esc(f.name)}${lk?' '+LOCKICON:''}</div></div>`; }).join('')}
             </div>
           </div>
         </details>
@@ -2687,7 +2729,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
       const hasSide=bSidebarStyle(d)!=='none';
       const main=`${blogSearchBox(d)}${previewBody(d)}`;
       const layout=hasSide?`<div class="blog-layout"><div class="blog-main">${main}</div>${blogSidebar(d,posts)}</div>`:main;
-      el.innerHTML=`<div class="blog ${dz.id} bf-${dz.bf} bh-${dz.bh} ${bAnim(d)} ${bTilt(d)}" style="min-height:auto">${blogTop(d,dz)}${blogTicker(d)}${blogHero(d,dz)}<div class="blog-wrap">${layout}</div></div>`;
+      el.innerHTML=`<div class="blog ${dz.id} bf-${dz.bf} bh-${dz.bh}${blogFrameClass(d)} ${bAnim(d)} ${bTilt(d)}" style="min-height:auto">${blogTop(d,dz)}${blogTicker(d)}${blogHero(d,dz)}<div class="blog-wrap">${layout}</div></div>`;
       if(d.threeD) wireBlogTilt(el);
     };
     function previewBody(d){
@@ -2708,13 +2750,22 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
 
     // design picker (locked designs need a subscription)
     $('#bdPicker').querySelectorAll('.bd-swatch').forEach(sw=>sw.onclick=()=>{
-      if(sw.dataset.locked && !isPremium()){ toast(t('هذا التصميم للمشتركين المميزين ✦','This design is for Premium subscribers ✦')); return; }
+      if(sw.dataset.locked && !canDesign()){ toast(t('هذا التصميم للمشتركين المميزين ✦','This design is for Premium subscribers ✦')); return; }
       blogState.design=sw.dataset.bd;
       $('#bdPicker').querySelectorAll('.bd-swatch').forEach(x=>x.classList.toggle('active',x===sw));
       repaint();
     });
     const bs=$('#bdSearch'); if(bs) bs.oninput=()=>{ const q=bs.value.trim();
       $('#bdPicker').querySelectorAll('.bd-swatch').forEach(el=>{ el.style.display=el.dataset.name.includes(q)?'':'none'; }); };
+
+    // blog frame picker (some frames are premium / coin-unlocked)
+    const bfr=$('#bFramesRow');
+    if(bfr) bfr.querySelectorAll('.frm').forEach(f=>f.onclick=()=>{
+      if(f.dataset.locked && !canDesign()){ toast(t('هذا الإطار مميّز ✦ — افتحه من متجر المكافآت','This frame is Premium ✦ — unlock it from the Rewards store')); return; }
+      blogState.frame=f.dataset.frm;
+      bfr.querySelectorAll('.frm').forEach(x=>x.classList.toggle('active',x===f));
+      repaint();
+    });
 
     // 3D / animation / search / sidebar / ticker options
     const chkThree=$('#f-b-threeD'); if(chkThree) chkThree.onchange=()=>{ blogState.threeD=chkThree.checked; repaint(); };
@@ -2873,7 +2924,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
         // free accounts can't save premium features (advanced elements + exclusive designs)
         if(!isPremium()){
           blogState.threeD=false; blogState.anim='none'; blogState.searchStyle='off'; blogState.sidebarStyle='none'; blogState.tickerStyle='none';
-          if(blogDesignLocked(blogState.design)) blogState.design='bd1';
+          if(blogDesignLocked(blogState.design) && !canDesign()) blogState.design='bd1';
         }
         const cleanPosts = blogState.posts.filter(p=>p&&(p.title||p.body)).map(p=>({...p, published:p.published!==false}));
         const pubCount = cleanPosts.filter(p=>p.published!==false).length;
@@ -3274,6 +3325,11 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
   async function getPremium(uid){ try{ const s=await get(child(ref(db),'premium/'+uid)); return s.exists()?s.val():null; }catch(e){ return null; } }
   const premiumActive = p => !!(p && p.active && (!p.expires || p.expires>Date.now()));
   const isPremium = () => !!(currentUser && currentUser.premium);
+  /* designs/layouts unlocked by spending earned coins in the rewards store (client-side).
+     Unlocks ONLY visual layouts/colors/blog-designs — NOT ad-free or the premium badge,
+     so paid Premium keeps its value while coins let users unlock the look. */
+  const designsUnlocked = () => { try{ return localStorage.getItem('elg_designs_unlocked')==='1'; }catch(e){ return false; } };
+  const canDesign = () => isPremium() || designsUnlocked();
   const fmtDay = ts => { try{ return new Date(ts).toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}); }catch{ return ''; } };
   /* ---- premium gating: which features require a subscription ---- */
   const FREE_BLOG_DESIGNS = 50;      // first 50 blog designs are free
@@ -4240,3 +4296,871 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
     if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||t('مستخدم','User'), photo:rec.photo||''}; cacheUser(currentUser); }
     await routeGuarded(); beginTracking(); applyPrem();
   })();
+
+/* ============================================================================
+   ENGAGEMENT ENGINE  —  self-contained, client-side (localStorage) hook layer.
+   Adds a first-visit welcome, XP + levels, daily streak, achievements, confetti
+   and a floating progress orb. Zero new DB rules, App-Check-safe, wrapped in
+   try/catch so it can NEVER break the rest of the site. Prefix: elg-/elg_.
+   Award XP from anywhere with:  window.elgXP(amount, 'reason')
+   ========================================================================== */
+(function(){
+  try{
+    if(window.__elgEngage) return; window.__elgEngage = true;
+    var L = (function(){ try{ var s=localStorage.getItem('apb_lang'); return (s==='en')?'en':'ar'; }catch(e){ return 'ar'; } })();
+    var RTL = L!=='en';
+    var T = function(ar,en){ return L==='en' ? en : ar; };
+    var KEY = 'elg_engage_v1';
+    var todayStr = function(){ var d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); };
+
+    /* ---------- state ---------- */
+    var S;
+    try{ S = JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ S=null; }
+    if(!S || typeof S!=='object'){
+      S = { xp:0, level:1, totalXp:0, streak:0, lastDay:null, days:0, pages:{}, ach:{}, seenWelcome:false, cooldown:{} };
+    }
+    S.pages = S.pages||{}; S.ach = S.ach||{}; S.cooldown = S.cooldown||{};
+    var save = function(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); localStorage.setItem('elg_level', S.level||1); }catch(e){} };
+    var need = function(lvl){ return 60 + lvl*40; };   // xp needed to reach next level
+
+    /* ---------- achievements ---------- */
+    var ACH = [
+      { id:'welcome', icon:'✨', ar:'أول خطوة',      en:'First Step',    dar:'أهلاً بك في elgoharyX', den:'Welcome aboard' },
+      { id:'explorer',icon:'🧭', ar:'مُستكشِف',       en:'Explorer',      dar:'زرت 4 صفحات مختلفة', den:'Visited 4 pages' },
+      { id:'streak3', icon:'🔥', ar:'3 أيام متتالية', en:'On Fire',       dar:'دخلت 3 أيام متتالية', den:'3-day streak' },
+      { id:'streak7', icon:'⚡', ar:'أسبوع كامل',     en:'Week Warrior',  dar:'دخلت 7 أيام متتالية', den:'7-day streak' },
+      { id:'level5',  icon:'🌟', ar:'نجم صاعد',       en:'Rising Star',   dar:'وصلت للمستوى 5', den:'Reached level 5' },
+      { id:'level10', icon:'👑', ar:'أسطورة',         en:'Legend',        dar:'وصلت للمستوى 10', den:'Reached level 10' },
+      { id:'creator', icon:'🎨', ar:'منشئ مبدع',      en:'Creator',       dar:'أنشأت أو حفظت عملاً', den:'Created something' },
+      { id:'sharer',  icon:'📣', ar:'سفير',           en:'Ambassador',    dar:'شاركت رابطًا', den:'Shared a link' }
+    ];
+    var achById = function(id){ for(var i=0;i<ACH.length;i++) if(ACH[i].id===id) return ACH[i]; return null; };
+
+    /* ---------- styles (injected once) ---------- */
+    var css = ''
+      + '.elg-orb{position:fixed;bottom:16px;'+(RTL?'left':'right')+':16px;z-index:99998;width:56px;height:56px;border-radius:50%;cursor:pointer;'
+      +   'background:var(--card,#111d33);box-shadow:0 8px 26px rgba(0,0,0,.45);display:grid;place-items:center;border:1px solid rgba(255,255,255,.08);'
+      +   'transition:transform .25s ease;font-family:inherit}'
+      + '.elg-orb:hover{transform:translateY(-3px) scale(1.05)}'
+      + '.elg-orb svg{position:absolute;inset:0;width:56px;height:56px;transform:rotate(-90deg)}'
+      + '.elg-orb .elg-lv{position:relative;font-weight:800;font-size:18px;color:var(--gold,#d0aa4e);line-height:1}'
+      + '.elg-orb .elg-lvt{position:absolute;bottom:6px;font-size:7px;letter-spacing:1px;color:#9fb0c8;font-weight:700}'
+      + '.elg-orb.elg-pulse{animation:elgPulse .7s ease}'
+      + '@keyframes elgPulse{0%{box-shadow:0 0 0 0 rgba(208,170,78,.6)}100%{box-shadow:0 0 0 22px rgba(208,170,78,0)}}'
+      + '.elg-panel{position:fixed;bottom:82px;'+(RTL?'left':'right')+':16px;z-index:99998;width:300px;max-width:calc(100vw - 32px);'
+      +   'background:var(--card,#111d33);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:16px;box-shadow:0 18px 50px rgba(0,0,0,.5);'
+      +   'transform:translateY(12px) scale(.96);opacity:0;pointer-events:none;transition:.24s cubic-bezier(.2,.8,.2,1);color:#e8eefb;direction:'+(RTL?'rtl':'ltr')+'}'
+      + '.elg-panel.on{transform:none;opacity:1;pointer-events:auto}'
+      + '.elg-ph{display:flex;align-items:center;gap:10px;margin-bottom:12px}'
+      + '.elg-ph .elg-ring{position:relative;width:44px;height:44px;flex:0 0 auto}'
+      + '.elg-ph .elg-ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:15px;font-weight:800;color:var(--gold,#d0aa4e)}'
+      + '.elg-ph .elg-meta{flex:1;min-width:0}'
+      + '.elg-ph .elg-meta .t{font-weight:800;font-size:14px}'
+      + '.elg-ph .elg-meta .s{font-size:11px;color:#9fb0c8}'
+      + '.elg-bar{height:8px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden;margin:2px 0 10px}'
+      + '.elg-bar i{display:block;height:100%;border-radius:99px;background:var(--grad-gold,linear-gradient(90deg,#e7c877,#d0aa4e));transition:width .5s ease}'
+      + '.elg-streak{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border-radius:12px;padding:8px 10px;margin-bottom:12px;font-size:13px}'
+      + '.elg-streak b{color:var(--gold,#d0aa4e)}'
+      + '.elg-atitle{font-size:11px;color:#9fb0c8;font-weight:700;margin:0 0 8px;letter-spacing:.5px}'
+      + '.elg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}'
+      + '.elg-a{aspect-ratio:1;border-radius:12px;display:grid;place-items:center;font-size:19px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.06);position:relative;filter:grayscale(1);opacity:.35;transition:.2s}'
+      + '.elg-a.got{filter:none;opacity:1;background:linear-gradient(135deg,rgba(208,170,78,.22),rgba(54,99,196,.18));border-color:rgba(208,170,78,.4)}'
+      + '.elg-a .tip{position:absolute;bottom:110%;'+(RTL?'right':'left')+':50%;transform:translateX('+(RTL?'50%':'-50%')+');background:#0a1120;color:#fff;font-size:10px;padding:4px 7px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:.15s;z-index:5}'
+      + '.elg-a:hover .tip{opacity:1}'
+      + '.elg-xp-fly{position:fixed;z-index:100000;font-weight:800;color:var(--gold,#d0aa4e);font-size:15px;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,.6);animation:elgFly 1.1s ease forwards}'
+      + '@keyframes elgFly{0%{opacity:0;transform:translateY(0) scale(.7)}20%{opacity:1;transform:translateY(-10px) scale(1.1)}100%{opacity:0;transform:translateY(-52px) scale(1)}}'
+      + '.elg-ov{position:fixed;inset:0;z-index:100001;background:rgba(6,10,20,.72);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;opacity:0;transition:.3s;padding:16px;overflow-y:auto;direction:'+(RTL?'rtl':'ltr')+'}'
+      + '.elg-ov.on{opacity:1}'
+      + '.elg-card{width:360px;max-width:100%;max-height:90vh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--card,#111d33);border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:26px 24px;text-align:center;color:#eaf1ff;'
+      +   'box-shadow:0 30px 80px rgba(0,0,0,.6);transform:translateY(16px) scale(.94);transition:.35s cubic-bezier(.2,.9,.2,1)}'
+      + '.elg-ov.on .elg-card{transform:none}'
+      + '.elg-emoji{font-size:52px;line-height:1;margin-bottom:6px;animation:elgPop .6s cubic-bezier(.2,1.5,.4,1)}'
+      + '@keyframes elgPop{0%{transform:scale(0) rotate(-25deg)}100%{transform:scale(1) rotate(0)}}'
+      + '.elg-card h3{margin:8px 0 4px;font-size:22px;font-weight:900;background:var(--grad-brand,linear-gradient(120deg,#7aa0ea,#d0aa4e));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}'
+      + '.elg-card p{margin:0 0 16px;font-size:14px;color:#b9c6dc;line-height:1.7}'
+      + '.elg-feats{display:flex;flex-direction:column;gap:10px;text-align:'+(RTL?'right':'left')+';margin:0 0 18px}'
+      + '.elg-feat{display:flex;align-items:center;gap:11px;font-size:13px;color:#dbe5f5}'
+      + '.elg-feat span{width:34px;height:34px;flex:0 0 auto;border-radius:10px;display:grid;place-items:center;font-size:17px;background:rgba(255,255,255,.06)}'
+      + '.elg-btn{width:100%;border:0;cursor:pointer;padding:13px;border-radius:14px;font-weight:800;font-size:15px;color:#10203a;'
+      +   'background:var(--grad-gold,linear-gradient(120deg,#e7c877,#d0aa4e));box-shadow:0 10px 26px rgba(208,170,78,.35);font-family:inherit;transition:.2s}'
+      + '.elg-btn:hover{transform:translateY(-2px)}'
+      + '.elg-skip{display:block;margin:12px auto 0;background:none;border:0;color:#8595ad;font-size:12px;cursor:pointer}'
+      + '.elg-toast{position:fixed;'+(RTL?'left':'right')+':16px;bottom:82px;z-index:100000;background:var(--card,#111d33);color:#eaf1ff;border:1px solid rgba(208,170,78,.4);'
+      +   'border-radius:14px;padding:11px 15px;font-size:13px;font-weight:700;box-shadow:0 14px 40px rgba(0,0,0,.5);display:flex;align-items:center;gap:9px;'
+      +   'transform:translateY(16px);opacity:0;transition:.3s;direction:'+(RTL?'rtl':'ltr')+'}'
+      + '.elg-toast.on{transform:none;opacity:1}'
+      + '.elg-toast .e{font-size:20px}'
+      + 'canvas.elg-confetti{position:fixed;inset:0;z-index:100002;pointer-events:none}'
+      + '.elg-orb.elg-has::after{content:"";position:absolute;top:-1px;'+(RTL?'left':'right')+':-1px;width:13px;height:13px;border-radius:50%;background:#ff4d6d;border:2px solid var(--card,#111d33);animation:elgDot 1.3s ease-in-out infinite;z-index:2}'
+      + '@keyframes elgDot{0%,100%{transform:scale(1)}50%{transform:scale(1.28)}}'
+      + '.elg-mute{margin-inline-start:auto;background:rgba(255,255,255,.06);border:0;border-radius:8px;cursor:pointer;font-size:14px;width:30px;height:30px;flex:0 0 auto;color:#fff}'
+      + '.elg-chest{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:10px;margin-bottom:12px}'
+      + '.elg-chest.rdy{border-color:rgba(208,170,78,.5);background:linear-gradient(135deg,rgba(208,170,78,.16),rgba(54,99,196,.1))}'
+      + '.elg-claim{width:100%;border:0;cursor:pointer;padding:11px;border-radius:11px;font-weight:800;font-size:14px;color:#10203a;background:var(--grad-gold,linear-gradient(120deg,#e7c877,#d0aa4e));box-shadow:0 8px 20px rgba(208,170,78,.35);font-family:inherit}'
+      + '.elg-claim b{background:rgba(0,0,0,.18);padding:1px 7px;border-radius:6px;margin-inline-start:4px}'
+      + '.elg-next{font-size:12px;color:#9fb0c8;text-align:center;padding:4px 0}'
+      + '.elg-days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:9px}'
+      + '.elg-day{font-size:9px;font-weight:800;text-align:center;padding:5px 0;border-radius:7px;background:rgba(255,255,255,.05);color:#8fa1bb;border:1px solid transparent}'
+      + '.elg-day.got{color:var(--gold,#d0aa4e);opacity:.5}'
+      + '.elg-day.now{background:var(--grad-gold,linear-gradient(120deg,#e7c877,#d0aa4e));color:#10203a;border-color:rgba(255,255,255,.25)}'
+      + '.elg-m{display:flex;align-items:center;gap:9px;padding:7px 0}'
+      + '.elg-m .mi{width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:grid;place-items:center;font-size:15px;background:rgba(255,255,255,.06)}'
+      + '.elg-m .mb{flex:1;min-width:0}'
+      + '.elg-m .ml{font-size:12px;margin-bottom:4px}.elg-m .ml b{color:var(--gold,#d0aa4e)}'
+      + '.elg-m .mp{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}'
+      + '.elg-m .mp i{display:block;height:100%;border-radius:99px;background:var(--grad-gold,linear-gradient(90deg,#e7c877,#d0aa4e));transition:width .5s ease}'
+      + '.elg-m .mc{font-size:11px;color:#9fb0c8;font-weight:700;flex:0 0 auto}'
+      + '.elg-m.done .ml{color:#8fa1bb;text-decoration:line-through}'
+      + '.elg-panel{max-height:calc(100vh - 120px);overflow-y:auto;-webkit-overflow-scrolling:touch}'
+      + '.elg-orb{bottom:calc(16px + env(safe-area-inset-bottom,0px))}'
+      + '.elg-panel{bottom:calc(82px + env(safe-area-inset-bottom,0px))}'
+      + '@media (max-width:520px){.elg-orb{width:52px;height:52px}.elg-orb svg{width:52px;height:52px}.elg-panel{width:calc(100vw - 20px);'+(RTL?'left':'right')+':10px;max-height:72vh}'
+      +   '.elg-ov{padding:12px}.elg-card{width:100%!important;padding:20px 16px;max-height:92vh;border-radius:20px}.elg-card h3{font-size:19px}.elg-emoji{font-size:44px}'
+      +   '.elg-store-list{max-height:46vh}.elg-game{height:240px;max-height:40vh}.elg-si .si-d{display:none}.elg-si{padding:9px 10px}}'
+      + '.elg-week{background:rgba(255,255,255,.04);border-radius:12px;padding:9px 11px;margin-bottom:12px}'
+      + '.elg-week .wh{font-size:12px;margin-bottom:6px}.elg-week .wh b{color:var(--gold,#d0aa4e)}'
+      + '.elg-week .mp{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}'
+      + '.elg-week .mp i{display:block;height:100%;border-radius:99px;background:var(--grad-brand,linear-gradient(90deg,#3663c4,#d0aa4e));transition:width .5s}'
+      + '.elg-wheelbtn{width:100%;cursor:pointer;padding:10px;border-radius:11px;font-weight:800;font-size:13px;color:#eaf1ff;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-family:inherit;margin-bottom:12px}'
+      + '.elg-wheelbtn.rdy{color:#10203a;background:linear-gradient(120deg,#7de3ff,#7aa0ea,#e7c877);border-color:transparent;animation:elgGlow2 1.5s ease-in-out infinite}'
+      + '@keyframes elgGlow2{0%,100%{box-shadow:0 0 0 0 rgba(125,227,255,0)}50%{box-shadow:0 0 0 5px rgba(125,227,255,.2)}}'
+      + '.elg-wheelwrap{position:relative;width:200px;height:200px;margin:8px auto 18px}'
+      + '.elg-ptr{position:absolute;top:-4px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:18px solid var(--gold,#d0aa4e);z-index:3;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}'
+      + '.elg-wheel{width:200px;height:200px;border-radius:50%;position:relative;border:6px solid rgba(255,255,255,.15);box-shadow:inset 0 0 34px rgba(0,0,0,.45),0 8px 30px rgba(0,0,0,.5)}'
+      + '.elg-wl{position:absolute;top:50%;left:50%;font-weight:800;font-size:14px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7)}'
+      + '.elg-tour{position:fixed;inset:0;z-index:100003;pointer-events:none;transition:opacity .25s}'
+      + '.elg-tour.out{opacity:0}'
+      + '.elg-spot{position:absolute;display:none;border-radius:14px;border:2px solid var(--gold,#d0aa4e);box-shadow:0 0 0 9999px rgba(6,10,20,.74),0 0 22px rgba(208,170,78,.5);transition:all .34s cubic-bezier(.2,.8,.2,1);pointer-events:none}'
+      + '.elg-tip{position:absolute;top:50%;left:50%;width:290px;max-width:calc(100vw - 24px);background:var(--card,#111d33);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:15px 16px;box-shadow:0 22px 55px rgba(0,0,0,.6);pointer-events:auto;transition:opacity .2s;color:#eaf1ff;direction:'+(RTL?'rtl':'ltr')+'}'
+      + '.elg-tip .tt{font-weight:900;font-size:16px;margin-bottom:5px;background:var(--grad-brand,linear-gradient(120deg,#7aa0ea,#d0aa4e));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}'
+      + '.elg-tip .td{font-size:13px;color:#c2cfe6;line-height:1.65;margin-bottom:13px}'
+      + '.elg-tip .tb{display:flex;align-items:center;gap:8px}'
+      + '.elg-tip .tp{font-size:11px;color:#8fa1bb;margin-inline-end:auto}'
+      + '.elg-tip .ts{background:none;border:0;color:#8fa1bb;cursor:pointer;font-size:12px;font-family:inherit}'
+      + '.elg-tip .tn{background:var(--grad-gold,linear-gradient(120deg,#e7c877,#d0aa4e));color:#10203a;border:0;border-radius:10px;padding:8px 16px;font-weight:800;cursor:pointer;font-family:inherit}'
+      + '.elg-energy{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.04);border-radius:12px;padding:8px 10px;margin-bottom:12px;font-size:13px}'
+      + '.elg-energy .eb{flex:1;height:7px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}'
+      + '.elg-energy .eb i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#7de3ff,#3663c4);transition:width .4s}'
+      + '.elg-energy .ec{color:#8fa1bb;font-weight:700;flex:0 0 auto}'
+      + '.elg-eclaim{border:0;cursor:pointer;border-radius:9px;padding:6px 11px;font-weight:800;font-size:12px;color:#10203a;background:linear-gradient(120deg,#7de3ff,#7aa0ea);font-family:inherit;flex:0 0 auto;animation:elgGlow2 1.4s ease-in-out infinite}'
+      + '.elg-gamebtn{width:100%;cursor:pointer;padding:10px;border-radius:11px;font-weight:800;font-size:13px;color:#eaf1ff;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);font-family:inherit;margin-bottom:12px}'
+      + '.elg-gbar{display:flex;justify-content:space-between;font-size:15px;font-weight:800;margin:6px 0 10px}.elg-gbar b{color:var(--gold,#d0aa4e)}'
+      + '.elg-game{position:relative;height:280px;max-height:44vh;background:radial-gradient(circle at 50% 15%,#13223f,#0a1120);border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.08);touch-action:none}'
+      + '.elg-star{position:absolute;font-size:27px;line-height:1;cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform .15s,opacity .15s;filter:drop-shadow(0 2px 5px rgba(0,0,0,.55))}'
+      + '.elg-coins{display:inline-flex;align-items:center;gap:3px;font-weight:800;color:#ffd77a;font-size:11px;margin-inline-start:8px}'
+      + '.elg-storebtn{width:100%;cursor:pointer;padding:10px;border-radius:11px;font-weight:800;font-size:13px;color:#10203a;background:linear-gradient(120deg,#ffdf91,#d0aa4e);border:0;font-family:inherit;margin-bottom:12px;box-shadow:0 8px 20px -12px rgba(208,170,78,.6)}'
+      + '.elg-store-list{display:flex;flex-direction:column;gap:9px;max-height:52vh;overflow-y:auto;margin:8px 0 2px;text-align:start}'
+      + '.elg-si{display:flex;align-items:center;gap:11px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:13px;padding:10px 11px}'
+      + '.elg-si .si-ic{width:38px;height:38px;flex:0 0 auto;border-radius:11px;display:grid;place-items:center;font-size:19px;background:rgba(255,255,255,.06)}'
+      + '.elg-si .si-b{flex:1;min-width:0}.elg-si .si-t{font-weight:800;font-size:13px}.elg-si .si-d{font-size:11px;color:#9fb0c8;line-height:1.5}'
+      + '.elg-si .si-buy{flex:0 0 auto;border:0;cursor:pointer;border-radius:10px;padding:8px 11px;font-weight:800;font-size:12px;color:#10203a;background:var(--grad-gold,linear-gradient(120deg,#e7c877,#d0aa4e));font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:3px}'
+      + '.elg-si .si-buy.owned{background:rgba(255,255,255,.08);color:#9fb0c8;cursor:default}'
+      + '.elg-si .si-buy.active{background:rgba(125,227,255,.22);color:#cdeffd;cursor:pointer}'
+      + '.elg-si.dim{opacity:.5}'
+      + '.elg-orb.elg-th-gold{background:linear-gradient(135deg,#3a2c07,#111d33)!important;border-color:rgba(208,170,78,.65)!important;box-shadow:0 8px 26px rgba(208,170,78,.4)!important}'
+      + '.elg-orb.elg-th-gold .elg-lv{color:#ffd77a!important}'
+      + '.elg-orb.elg-th-neon{border-color:#7de3ff!important;box-shadow:0 0 18px rgba(125,227,255,.55),0 8px 26px rgba(0,0,0,.45)!important}'
+      + '.elg-orb.elg-th-neon .elg-lv{color:#7de3ff!important}'
+      + '.elg-orb.elg-th-emerald{border-color:#37d99a!important;box-shadow:0 0 16px rgba(55,217,154,.5),0 8px 26px rgba(0,0,0,.45)!important}'
+      + '.elg-orb.elg-th-emerald .elg-lv{color:#5df0b6!important}'
+      + '.elg-orb.elg-th-royal{background:linear-gradient(135deg,#2a1150,#111d33)!important;border-color:#a074e6!important;box-shadow:0 0 18px rgba(160,116,230,.55),0 8px 26px rgba(0,0,0,.45)!important}'
+      + '.elg-orb.elg-th-royal .elg-lv{color:#c9a8ff!important}'
+      + '.elg-orb.elg-th-sunset{background:linear-gradient(135deg,#3a1a10,#111d33)!important;border-color:#ff9e5e!important;box-shadow:0 0 18px rgba(255,158,94,.5),0 8px 26px rgba(0,0,0,.45)!important}'
+      + '.elg-orb.elg-th-sunset .elg-lv{color:#ffc08a!important}'
+      + '.elg-boostchip{display:inline-flex;align-items:center;gap:4px;background:linear-gradient(120deg,#7de3ff,#7aa0ea);color:#0a1120;font-weight:800;font-size:11px;padding:3px 9px;border-radius:99px;margin-bottom:10px}'
+      + '.elg-cpresets{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:12px 0 16px}'
+      + '.elg-cp{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid rgba(255,255,255,.18);transition:transform .15s}'
+      + '.elg-cp:hover{transform:scale(1.14)}'
+      + '.elg-cpick{border-radius:14px;overflow:hidden;padding:0}'
+      + '.elg-mybadges{font-size:13px;letter-spacing:2px;margin-inline-start:3px}'
+      + '.elg-notifbtn{width:100%;cursor:pointer;padding:10px;border-radius:11px;font-weight:800;font-size:13px;color:#06251a;background:linear-gradient(120deg,#37d99a,#7de3ff);border:0;font-family:inherit;margin-bottom:12px}';
+    try{ var st=document.createElement('style'); st.textContent=css; document.head.appendChild(st); }catch(e){}
+
+    /* ---------- confetti ---------- */
+    function confetti(){
+      try{
+        var c=document.createElement('canvas'); c.className='elg-confetti';
+        c.width=innerWidth; c.height=innerHeight; document.body.appendChild(c);
+        var ctx=c.getContext('2d'), cols=['#d0aa4e','#e7c877','#3663c4','#7aa0ea','#ffffff','#ff8fb1'], P=[];
+        for(var i=0;i<110;i++) P.push({x:Math.random()*c.width,y:-20-Math.random()*c.height*0.4,r:4+Math.random()*5,
+          c:cols[i%cols.length],vy:2+Math.random()*4,vx:-2+Math.random()*4,rot:Math.random()*6,vr:-0.2+Math.random()*0.4});
+        var t0=Date.now();
+        (function loop(){
+          ctx.clearRect(0,0,c.width,c.height); var done=true;
+          for(var i=0;i<P.length;i++){ var p=P[i]; p.y+=p.vy; p.x+=p.vx; p.vy+=0.05; p.rot+=p.vr;
+            if(p.y<c.height+20) done=false;
+            ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle=p.c;
+            ctx.globalAlpha=Math.max(0,1-(Date.now()-t0)/2600); ctx.fillRect(-p.r,-p.r,p.r*2,p.r*1.4); ctx.restore(); }
+          if(!done && Date.now()-t0<2800) requestAnimationFrame(loop); else c.remove();
+        })();
+      }catch(e){}
+    }
+
+    /* ---------- small UI helpers ---------- */
+    function flyXP(n){
+      try{ var orb=document.querySelector('.elg-orb'); var r=orb?orb.getBoundingClientRect():{left:innerWidth/2,top:innerHeight-90,width:56};
+        var el=document.createElement('div'); el.className='elg-xp-fly'; el.textContent='+'+n+' XP';
+        el.style.left=(r.left+r.width/2-14)+'px'; el.style.top=(r.top-6)+'px'; document.body.appendChild(el);
+        setTimeout(function(){ el.remove(); },1100);
+      }catch(e){}
+    }
+    var toastQ=[], toastBusy=false;
+    function popToast(emoji,msg){
+      toastQ.push([emoji,msg]); if(toastBusy) return; toastBusy=true;
+      (function next(){
+        if(!toastQ.length){ toastBusy=false; return; }
+        var it=toastQ.shift(); var el=document.createElement('div'); el.className='elg-toast';
+        el.innerHTML='<span class="e"></span><span class="m"></span>';
+        el.querySelector('.e').textContent=it[0]; el.querySelector('.m').textContent=it[1];
+        document.body.appendChild(el); requestAnimationFrame(function(){ el.classList.add('on'); });
+        setTimeout(function(){ el.classList.remove('on'); setTimeout(function(){ el.remove(); next(); },320); },2600);
+      })();
+    }
+    function ring(size,pct,stroke){
+      var r=(size-stroke)/2, c=2*Math.PI*r, off=c*(1-Math.max(0,Math.min(1,pct)));
+      return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">'
+        +'<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="'+stroke+'"/>'
+        +'<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="var(--gold,#d0aa4e)" stroke-width="'+stroke+'" '
+        +'stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" style="transition:stroke-dashoffset .6s ease"/></svg>';
+    }
+
+    /* ---------- core: award xp / level / achievements ---------- */
+    function unlock(id){
+      if(S.ach[id]) return; var a=achById(id); if(!a) return;
+      S.ach[id]=Date.now(); save();
+      setTimeout(function(){ confetti(); SFX.achieve(); haptic([10,30,10]); showCard(a.icon, T('إنجاز جديد!','Achievement!'), '<b>'+T(a.ar,a.en)+'</b><br>'+T(a.dar,a.den), true, '+40 XP'); notifyOS(a.icon+' '+T('إنجاز جديد!','Achievement unlocked!'), T(a.ar,a.en)); addXp(40,'achievement',true); },250);
+    }
+    function checkAch(){
+      if(S.streak>=3) unlock('streak3');
+      if(S.streak>=7) unlock('streak7');
+      if(S.level>=5) unlock('level5');
+      if(S.level>=10) unlock('level10');
+      if(Object.keys(S.pages).length>=4) unlock('explorer');
+    }
+    function addXp(n,reason,silent){
+      n=Math.max(0,n|0); if(!n) return;
+      if(boostActive()) n=n*(S.boostMult||2);           // ×2 / ×3 XP boost from the store
+      S.coins=(S.coins||0)+Math.ceil(n*0.35);           // earn spendable coins alongside XP
+      S.xp+=n; S.totalXp+=n;
+      try{ var wk=ensureWeek(); wk.earned+=n;
+        if(!wk.claimed && wk.earned>=wk.goal){ wk.claimed=true;
+          setTimeout(function(){ confetti(); celebrate(); showCard('🏆', T('تحدّي الأسبوع!','Weekly Challenge!'), T('أكملت هدف الأسبوع','You hit the weekly goal!')+' <b>+100 XP</b>', true, '+100 XP'); addXp(100,'week',true); }, 320); } }catch(e){}
+      var up=false;
+      while(S.xp>=need(S.level)){ S.xp-=need(S.level); S.level++; up=true; }
+      save(); if(!silent){ flyXP(n); SFX.coin(); }
+      renderOrb();
+      if(up){ var _ti=titleFor(S.level), _rk=(S.rank!==_ti.en); if(_rk){ S.rank=_ti.en; save(); }
+        setTimeout(function(){ confetti(); SFX.levelup(); haptic([15,40,15]);
+        showCard('🎉', T('مستوى جديد!','Level Up!'), T('وصلت للمستوى','You reached level')+' <b>'+S.level+'</b> — '+_ti.ic+' '+T(_ti.ar,_ti.en), true);
+        notifyOS('🎉 '+T('مستوى جديد!','Level up!'), T('وصلت للمستوى','You reached level')+' '+S.level+' — '+T(_ti.ar,_ti.en));
+        if(_rk) popToast(_ti.ic, T('رتبة جديدة: ','New rank: ')+T(_ti.ar,_ti.en));
+        var o=document.querySelector('.elg-orb'); if(o){ o.classList.add('elg-pulse'); setTimeout(function(){o.classList.remove('elg-pulse');},700);} },silent?400:60); }
+      checkAch();
+    }
+    // cooldown-guarded award (per reason, per window) to avoid spam
+    function awardOncePer(reason, ms, n){
+      var last=S.cooldown[reason]||0; if(Date.now()-last<ms) return false;
+      S.cooldown[reason]=Date.now(); save(); addXp(n,reason); return true;
+    }
+    window.elgXP = function(n,reason){ try{ addXp(n||0, reason||'action'); }catch(e){} };
+
+    /* ---------- floating orb + panel ---------- */
+    function renderOrb(){
+      var orb=document.querySelector('.elg-orb'); if(!orb) return;
+      var pct=S.xp/need(S.level);
+      orb.innerHTML=ring(56,pct,4)+'<span class="elg-lv">'+S.level+'</span><span class="elg-lvt">LVL</span>';
+      updateDot(); applyCosmetics();
+      var panel=document.querySelector('.elg-panel'); if(panel && panel.classList.contains('on')) renderPanel();
+    }
+    function renderPanel(){
+      var p=document.querySelector('.elg-panel'); if(!p) return;
+      var pct=Math.round(S.xp/need(S.level)*100);
+      var grid=ACH.map(function(a){ var got=!!S.ach[a.id];
+        return '<div class="elg-a'+(got?' got':'')+'">'+a.icon+'<span class="tip">'+T(a.ar,a.en)+'</span></div>'; }).join('');
+      var ready=chestReady(), cyc=((S.chest&&S.chest.cycle)||0);
+      var days=[0,1,2,3,4,5,6].map(function(i){
+        return '<span class="elg-day'+(i<cyc?' got':'')+((i===(cyc%7)&&ready)?' now':'')+'">'+CHEST[i]+'</span>'; }).join('');
+      var chestHtml='<div class="elg-atitle">'+T('صندوق يومي','DAILY CHEST')+'</div>'
+        +'<div class="elg-chest'+(ready?' rdy':'')+'">'
+        +(ready
+            ? '<button class="elg-claim">🎁 '+T('اجمع مكافأة اليوم','Claim daily reward')+' <b>+'+CHEST[cyc%7]+'</b></button>'
+            : '<div class="elg-next">✅ '+T('تم استلام اليوم','Claimed')+' · '+T('التالي بعد','next in')+' '+fmtHM(msToMidnight())+'</div>')
+        +'<div class="elg-days">'+days+'</div></div>';
+      var ms=ensureMissions();
+      var mHtml='<div class="elg-atitle">'+T('مهام اليوم','DAILY MISSIONS')+'</div>'
+        + ms.list.map(function(m){ var w=Math.round(Math.min(1,(m.prog||0)/m.goal)*100);
+            return '<div class="elg-m'+(m.done?' done':'')+'"><span class="mi">'+(m.done?'✅':m.ic)+'</span>'
+              +'<div class="mb"><div class="ml">'+T(m.ar,m.en)+' <b>+'+m.xp+'</b></div>'
+              +'<div class="mp"><i style="width:'+w+'%"></i></div></div>'
+              +'<span class="mc">'+(m.prog||0)+'/'+m.goal+'</span></div>'; }).join('');
+      var wk=ensureWeek(), wpct=Math.round(Math.min(1,wk.earned/wk.goal)*100);
+      var weekHtml='<div class="elg-week"><div class="wh">🏆 '+T('تحدّي الأسبوع','Weekly challenge')+' <b>'+wk.earned+'/'+wk.goal+' XP</b>'+(wk.claimed?' ✅':'')+'</div><div class="mp"><i style="width:'+wpct+'%"></i></div></div>';
+      var spinR=spinReady();
+      var wheelHtml='<button class="elg-wheelbtn'+(spinR?' rdy':'')+'">🎡 '+(spinR?T('لفّة اليوم المجانية!','Daily free spin!'):T('عجلة الحظ — عُد غدًا','Lucky wheel — tomorrow'))+'</button>';
+      var en=ensureEnergy(), epct=Math.round(Math.min(1,en.prog/ENERGY_GOAL)*100), eready=en.prog>=ENERGY_GOAL;
+      var energyHtml='<div class="elg-energy"><span>⚡</span><div class="eb"><i style="width:'+epct+'%"></i></div>'+(eready?'<button class="elg-eclaim">'+T('اجمع','Claim')+' +'+energyReward()+'</button>':'<span class="ec">'+en.prog+'/'+ENERGY_GOAL+'</span>')+'</div>';
+      var gameHtml='<button class="elg-gamebtn">🎮 '+T('لعبة سريعة — اصطياد النجوم','Quick game — Catch stars')+'</button>';
+      var storeHtml='<button class="elg-storebtn">🛍️ '+T('متجر المكافآت','Rewards store')+' · 🪙 '+(S.coins||0)+'</button>';
+      var boostHtml=boostActive()?'<div class="elg-boostchip">⚡ '+T('مضاعفة ×'+(S.boostMult||2)+' فعّالة الآن',(S.boostMult||2)+'× XP boost active')+'</div>':'';
+      var myBadges=STORE.filter(function(x){return x.type==='badge' && owned(x.id);}).map(function(x){return x.ic;}).join(' ');
+      var notifOn=(notifCap() && S.osNotif && Notification.permission==='granted');
+      var notifHtml=notifOn ? '' : '<button class="elg-notifbtn">🔔 '+T('فعّل تنبيهات جهازك','Enable device alerts')+'</button>';
+      p.innerHTML=''
+        +'<div class="elg-ph"><div class="elg-ring">'+ring(44,S.xp/need(S.level),4)+'<b>'+S.level+'</b></div>'
+        +'<div class="elg-meta"><div class="t">'+titleFor(S.level).ic+' '+T(titleFor(S.level).ar,titleFor(S.level).en)+' · L'+S.level+(myBadges?' <span class="elg-mybadges">'+myBadges+'</span>':'')+'</div><div class="s">'+S.xp+' / '+need(S.level)+' XP<span class="elg-coins">🪙 '+(S.coins||0)+'</span></div></div>'
+        +'<button class="elg-mute" title="'+T('الصوت','Sound')+'">'+(S.muted?'🔇':'🔊')+'</button></div>'
+        +'<div class="elg-bar"><i style="width:'+pct+'%"></i></div>'
+        +'<div class="elg-streak">🔥 <span>'+T('سلسلة الأيام','Daily streak')+':</span> <b>'+S.streak+' '+T('يوم','days')+'</b></div>'
+        + boostHtml + notifHtml + weekHtml + energyHtml + wheelHtml + gameHtml + storeHtml + chestHtml + mHtml
+        +'<div class="elg-atitle">'+T('الإنجازات','ACHIEVEMENTS')+' ('+Object.keys(S.ach).length+'/'+ACH.length+')</div>'
+        +'<div class="elg-grid">'+grid+'</div>';
+      var cb=p.querySelector('.elg-claim'); if(cb) cb.onclick=function(e){ e.stopPropagation(); claimChest(); renderPanel(); };
+      var mt=p.querySelector('.elg-mute'); if(mt) mt.onclick=function(e){ e.stopPropagation(); S.muted=!S.muted; save(); renderPanel(); if(!S.muted) SFX.toggle(true); };
+      var wb=p.querySelector('.elg-wheelbtn'); if(wb) wb.onclick=function(e){ e.stopPropagation(); openWheel(); };
+      var ec=p.querySelector('.elg-eclaim'); if(ec) ec.onclick=function(e){ e.stopPropagation(); claimEnergy(); renderPanel(); };
+      var gb=p.querySelector('.elg-gamebtn'); if(gb) gb.onclick=function(e){ e.stopPropagation(); openGame(); };
+      var sb2=p.querySelector('.elg-storebtn'); if(sb2) sb2.onclick=function(e){ e.stopPropagation(); openStore(); };
+      var nb=p.querySelector('.elg-notifbtn'); if(nb) nb.onclick=function(e){ e.stopPropagation(); askNotif(); };
+    }
+    function buildOrb(){
+      if(document.querySelector('.elg-orb')) return;
+      var orb=document.createElement('div'); orb.className='elg-orb'; orb.title=T('تقدّمك','Your progress'); document.body.appendChild(orb);
+      var panel=document.createElement('div'); panel.className='elg-panel'; document.body.appendChild(panel);
+      orb.addEventListener('click', function(){ var on=panel.classList.toggle('on'); if(on){ renderPanel(); SFX.open(); } else SFX.close(); });
+      document.addEventListener('click', function(e){ if(!panel.contains(e.target) && e.target!==orb && !orb.contains(e.target)) panel.classList.remove('on'); });
+      renderOrb();
+    }
+
+    /* ---------- celebratory / welcome card ---------- */
+    function showCard(emoji,title,html,auto,badge){
+      try{
+        var ov=document.createElement('div'); ov.className='elg-ov';
+        ov.innerHTML='<div class="elg-card"><div class="elg-emoji">'+emoji+'</div><h3>'+title+'</h3>'
+          +'<p>'+html+'</p>'+(badge?'<div style="font-weight:800;color:var(--gold,#d0aa4e);margin:-6px 0 14px">'+badge+'</div>':'')
+          +'<button class="elg-btn">'+T('رائع!','Awesome!')+'</button></div>';
+        document.body.appendChild(ov); requestAnimationFrame(function(){ ov.classList.add('on'); });
+        var close=function(){ ov.classList.remove('on'); setTimeout(function(){ ov.remove(); },340); };
+        ov.querySelector('.elg-btn').addEventListener('click',close);
+        ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+        if(auto) setTimeout(close, 3200);
+      }catch(e){}
+    }
+    function showWelcome(){
+      try{
+        var ov=document.createElement('div'); ov.className='elg-ov';
+        ov.innerHTML='<div class="elg-card"><div class="elg-emoji">👋</div>'
+          +'<h3>'+T('أهلاً بك في elgoharyX','Welcome to elgoharyX')+'</h3>'
+          +'<p>'+T('أنشئ بطاقتك التعريفية أو مدونتك الاحترافية في دقائق — وشاركها مع العالم.','Build your professional ID card or blog in minutes — and share it with the world.')+'</p>'
+          +'<div class="elg-feats">'
+          +'<div class="elg-feat"><span>🪪</span>'+T('بطاقة تعريف أنيقة بلمسة واحدة','A stunning ID card in one tap')+'</div>'
+          +'<div class="elg-feat"><span>📝</span>'+T('مدونة احترافية بتصاميم جاهزة','A pro blog with ready designs')+'</div>'
+          +'<div class="elg-feat"><span>🏆</span>'+T('اجمع نقاطًا وإنجازات كلما استخدمت الموقع','Earn XP & achievements as you go')+'</div>'
+          +'</div><button class="elg-btn">'+T('لنبدأ 🚀','Let’s go 🚀')+'</button>'
+          +'<button class="elg-skip">'+T('تخطّي','Skip')+'</button></div>';
+        document.body.appendChild(ov); requestAnimationFrame(function(){ ov.classList.add('on'); }); SFX.whoosh();
+        var reward=function(){ setTimeout(function(){ confetti(); addXp(50,'welcome'); unlock('welcome'); }, 180); };
+        var close=function(tour){ ov.classList.remove('on'); setTimeout(function(){ ov.remove(); },340); reward(); if(tour) setTimeout(function(){ startTour(); }, 560); };
+        ov.querySelector('.elg-btn').addEventListener('click',function(){ SFX.click(); close(true); });
+        ov.querySelector('.elg-skip').addEventListener('click',function(){ SFX.click(); close(false); });
+        ov.addEventListener('click',function(e){ if(e.target===ov) close(false); });
+      }catch(e){}
+    }
+
+    /* ---------- daily streak + page tracking ---------- */
+    function tickDay(){
+      var d=todayStr();
+      if(S.lastDay!==d){
+        var y=new Date(); y.setDate(y.getDate()-1);
+        var yStr=y.getFullYear()+'-'+(y.getMonth()+1)+'-'+y.getDate();
+        if(S.lastDay===yStr){ S.streak=(S.streak||0)+1; }
+        else if((S.streakFreeze||0)>0 && S.lastDay){ S.streakFreeze--; setTimeout(function(){ popToast('🧊', T('تم استخدام تجميد السلسلة — سلسلتك محفوظة','Streak freeze used — streak saved')); },1200); }
+        else { S.streak=1; }
+        S.lastDay=d; S.days=(S.days||0)+1; S.pages={}; save();
+        if(S.seenWelcome){ // don't stack on the very first welcome
+          var bonus=10+Math.min(20,S.streak*2);
+          setTimeout(function(){ popToast('🔥', T('يومك رقم','Day')+' '+S.streak+' · +'+bonus+' XP'); addXp(bonus,'daily'); }, 900);
+        }
+      }
+    }
+    function trackPage(){
+      try{ var pg=(location.pathname.split('/').pop()||'index')||'index';
+        if(!S.pages[pg]){ S.pages[pg]=1; save(); awardOncePer('page_'+pg, 60000, 8); checkAch(); missionProgress('visit'); if(/explore/i.test(pg)) missionProgress('explore'); }
+      }catch(e){}
+    }
+
+    /* ---------- hook real actions (no edits to existing code) ---------- */
+    function hookActions(){
+      try{
+        // success toasts from the app → reward creating/saving
+        var toastEl=document.getElementById('toast');
+        if(toastEl){
+          new MutationObserver(function(){
+            var tx=(toastEl.textContent||'');
+            if(/حفظ|إنشاء|أُضيف|أضيف|saved|created|added|published|نُشر/i.test(tx)){
+              if(awardOncePer('create',4000,25)){ unlock('creator'); missionProgress('create'); }
+            }
+            if(/إنشاء الحساب|Account created/i.test(tx) && !S.tourDone){ setTimeout(function(){ startTour(); }, 900); }
+          }).observe(toastEl,{childList:true,characterData:true,subtree:true});
+        }
+        // share / copy-link clicks
+        document.addEventListener('click', function(e){
+          var el=e.target.closest && e.target.closest('[data-share],[data-link],[data-qr],.share,[class*="share"]');
+          if(el){ if(awardOncePer('share',4000,15)){ unlock('sharer'); missionProgress('share'); } }
+        }, true);
+        // subtle professional click sound on interactive elements (respects mute)
+        document.addEventListener('pointerdown', function(e){
+          try{ var el=e.target.closest && e.target.closest('button,a,[role="button"],.btn,label,summary,input[type="checkbox"],input[type="radio"]');
+            if(el && !el.closest('.elg-tour')) SFX.click(); }catch(x){}
+        }, true);
+      }catch(e){}
+    }
+
+    /* ---------- juice: professional sound design + haptics ---------- */
+    function haptic(p){ try{ if(!S.muted && navigator.vibrate) navigator.vibrate(p||15); }catch(e){} }
+    var _ac=null;
+    function _actx(){ try{ if(!_ac) _ac=new (window.AudioContext||window.webkitAudioContext)(); if(_ac.state==='suspended') _ac.resume(); return _ac; }catch(e){ return null; } }
+    /* one shaped note */
+    function tone(freq,dur,type,vol,delay){ try{ if(S.muted) return; var ac=_actx(); if(!ac) return;
+      var o=ac.createOscillator(), g=ac.createGain(); o.type=type||'sine'; var t=ac.currentTime+(delay||0);
+      o.frequency.setValueAtTime(freq,t); o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol||0.09,t+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+(dur||0.15)); o.start(t); o.stop(t+(dur||0.15)+0.03); }catch(e){} }
+    /* gliding note (whoosh) */
+    function sweep(f1,f2,dur,type,vol){ try{ if(S.muted) return; var ac=_actx(); if(!ac) return;
+      var o=ac.createOscillator(), g=ac.createGain(); o.type=type||'sine'; var t=ac.currentTime;
+      o.frequency.setValueAtTime(f1,t); o.frequency.exponentialRampToValueAtTime(Math.max(1,f2),t+dur); o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol||0.07,t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.start(t); o.stop(t+dur+0.03); }catch(e){} }
+    /* named UI sound effects */
+    var SFX={
+      click:  function(){ tone(330,0.045,'triangle',0.045); },
+      open:   function(){ sweep(320,780,0.16,'sine',0.06); },
+      close:  function(){ sweep(720,300,0.15,'sine',0.05); },
+      coin:   function(){ tone(1046,0.06,'square',0.05); tone(1568,0.09,'square',0.045,0.05); },
+      success:function(){ tone(660,0.1,'sine',0.08); tone(880,0.14,'sine',0.08,0.09); },
+      achieve:function(){ [784,988,1319].forEach(function(f,i){ tone(f,0.15,'sine',0.08,i*0.07); }); },
+      levelup:function(){ [523,659,784,1046].forEach(function(f,i){ tone(f,0.17,'triangle',0.09,i*0.09); }); },
+      reward: function(){ [659,784,988,1319].forEach(function(f,i){ tone(f,0.18,'triangle',0.095,i*0.1); }); },
+      whoosh: function(){ sweep(220,880,0.2,'sine',0.05); },
+      error:  function(){ tone(190,0.18,'sawtooth',0.06); },
+      toggle: function(on){ tone(on?720:400,0.08,'sine',0.06); }
+    };
+    /* legacy alias kept so older calls still work */
+    function ding(freq,dur,vol){ tone(freq,dur||0.15,'sine',vol||0.1); }
+    function celebrate(){ haptic([12,30,12]); SFX.reward(); }
+
+    /* ---------- daily reward chest (7-day escalating) ---------- */
+    var CHEST=[20,30,45,65,95,140,240];
+    function chestReady(){ S.chest=S.chest||{last:null,cycle:0}; return S.chest.last!==todayStr(); }
+    function msToMidnight(){ var n=new Date(), m=new Date(n.getFullYear(),n.getMonth(),n.getDate()+1,0,0,0); return m-n; }
+    function fmtHM(ms){ var h=Math.floor(ms/3600000), mm=Math.floor(ms%3600000/60000); return h+T('س',' h')+' '+mm+T('د',' m'); }
+    function claimChest(){
+      S.chest=S.chest||{last:null,cycle:0}; if(!chestReady()) return;
+      var idx=(S.chest.cycle||0)%7, reward=CHEST[idx];
+      S.chest.last=todayStr(); S.chest.cycle=((S.chest.cycle||0)+1)%7; save();
+      confetti(); celebrate(); addXp(reward,'chest',true);
+      showCard('🎁', T('صندوق اليوم!','Daily Chest!'), T('يوم','Day')+' '+(idx+1)+' · <b>+'+reward+' XP</b>'+(idx===6?'<br>'+T('أكملت الأسبوع كاملاً! 🏆','Full week complete! 🏆'):''), true, '+'+reward+' XP');
+      updateDot();
+    }
+
+    /* ---------- daily missions (3/day, rotate) ---------- */
+    var MPOOL=[
+      {id:'visit',  ic:'🧭', ar:'تصفّح 3 صفحات',       en:'Visit 3 pages',   goal:3, xp:20},
+      {id:'create', ic:'🎨', ar:'أنشئ أو احفظ عملاً',   en:'Create or save',  goal:1, xp:35},
+      {id:'share',  ic:'📣', ar:'شارك رابطًا',          en:'Share a link',    goal:1, xp:25},
+      {id:'time',   ic:'⏱️', ar:'اقضِ 5 دقائق بالموقع', en:'Spend 5 minutes', goal:5, xp:20},
+      {id:'explore',ic:'🔎', ar:'افتح صفحة الاستكشاف',  en:'Open Explore',    goal:1, xp:20}
+    ];
+    function ensureMissions(){
+      var d=todayStr();
+      if(!S.missions || S.missions.date!==d){
+        var seed=d.split('-').reduce(function(a,b){ return a+parseInt(b,10); },0);
+        var pool=MPOOL.slice(), picked=[];
+        for(var i=0;i<3 && pool.length;i++){ var j=(seed+i*2)%pool.length; var m=pool.splice(j,1)[0];
+          picked.push({id:m.id,ic:m.ic,ar:m.ar,en:m.en,goal:m.goal,xp:m.xp,prog:0,done:false}); }
+        S.missions={date:d, list:picked, bonus:false}; save();
+      }
+      return S.missions;
+    }
+    function missionProgress(id,inc){
+      try{
+        ensureMissions(); var changed=false;
+        S.missions.list.forEach(function(m){ if(m.id===id && !m.done){ m.prog=Math.min(m.goal,(m.prog||0)+(inc||1));
+          if(m.prog>=m.goal){ m.done=true; changed=true; addXp(m.xp,'mission',true); SFX.success(); haptic(20); popToast('✅', T('مهمة مكتملة','Mission complete')+' · +'+m.xp+' XP'); } } });
+        if(changed){ save();
+          if(!S.missions.bonus && S.missions.list.every(function(m){ return m.done; })){ S.missions.bonus=true; save();
+            setTimeout(function(){ confetti(); celebrate(); showCard('🌟', T('أنجزت مهام اليوم!','All missions done!'), T('مكافأة إضافية','Bonus reward')+' <b>+60 XP</b>', true, '+60 XP'); addXp(60,'mission_all',true); }, 320); } }
+        updateDot(); var pn=document.querySelector('.elg-panel'); if(pn && pn.classList.contains('on')) renderPanel();
+      }catch(e){}
+    }
+
+    /* ---------- notify dot on the orb when something is claimable ---------- */
+    function updateDot(){
+      var orb=document.querySelector('.elg-orb'); if(!orb) return;
+      var need = chestReady() || spinReady() || energyReady() || ensureMissions().list.some(function(m){ return !m.done; });
+      orb.classList.toggle('elg-has', !!need);
+    }
+
+    /* ---------- rank titles ---------- */
+    function titleFor(lv){
+      if(lv>=25) return {ic:'👑', ar:'أسطورة', en:'Legend'};
+      if(lv>=17) return {ic:'🏆', ar:'بطل',    en:'Champion'};
+      if(lv>=12) return {ic:'🌟', ar:'نجم',    en:'Star'};
+      if(lv>=8)  return {ic:'💎', ar:'خبير',   en:'Expert'};
+      if(lv>=5)  return {ic:'🔷', ar:'محترف',  en:'Pro'};
+      if(lv>=3)  return {ic:'⭐', ar:'نشيط',    en:'Active'};
+      return {ic:'🌱', ar:'مبتدئ', en:'Novice'};
+    }
+
+    /* ---------- weekly challenge ---------- */
+    function weekId(){ var d=new Date(); var day=(d.getDay()+6)%7; d.setDate(d.getDate()-day); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+    function ensureWeek(){ var id=weekId(); if(!S.week || S.week.id!==id){ S.week={id:id, earned:0, goal:300, claimed:false}; save(); } return S.week; }
+
+    /* ---------- daily lucky wheel ---------- */
+    var WHEEL=[10,25,50,15,100,20,40,30];
+    function spinReady(){ S.spin=S.spin||{last:null}; return S.spin.last!==todayStr(); }
+    function openWheel(){
+      try{
+        if(!spinReady()){ popToast('⏳', T('لفّة اليوم انتهت — عُد غدًا','Spin used — come back tomorrow')); return; }
+        var segs=WHEEL.length, seg=360/segs;
+        var conic=WHEEL.map(function(v,i){ return ((i%2)?'#1b2c4d':'#294170')+' '+(i*seg)+'deg '+((i+1)*seg)+'deg'; }).join(',');
+        var labels=WHEEL.map(function(v,i){ var a=i*seg+seg/2; return '<span class="elg-wl" style="transform:translate(-50%,-50%) rotate('+a+'deg) translateY(-70px)">'+v+'</span>'; }).join('');
+        var ov=document.createElement('div'); ov.className='elg-ov';
+        ov.innerHTML='<div class="elg-card"><div class="elg-emoji">🎡</div><h3>'+T('عجلة الحظ اليومية','Daily Lucky Wheel')+'</h3>'
+          +'<p>'+T('لفّة مجانية كل يوم — اربح نقاطًا فورية!','One free spin daily — win instant XP!')+'</p>'
+          +'<div class="elg-wheelwrap"><div class="elg-ptr"></div><div class="elg-wheel" style="background:conic-gradient('+conic+')">'+labels+'</div></div>'
+          +'<button class="elg-btn elg-spin">'+T('لُفّ! 🎯','Spin! 🎯')+'</button></div>';
+        document.body.appendChild(ov); requestAnimationFrame(function(){ ov.classList.add('on'); }); SFX.whoosh();
+        var spun=false;
+        ov.querySelector('.elg-spin').addEventListener('click', function(){
+          if(spun) return; spun=true;
+          var idx=Math.floor(Math.random()*segs), reward=WHEEL[idx];
+          var target=360*5 + (360 - (idx*seg + seg/2));
+          var w=ov.querySelector('.elg-wheel'); w.style.transition='transform 4.2s cubic-bezier(.15,.72,.18,1)'; w.style.transform='rotate('+target+'deg)';
+          haptic(25); S.spin={last:todayStr()}; save(); updateDot();
+          var btn=ov.querySelector('.elg-spin'); btn.disabled=true; btn.textContent=T('...','...');
+          setTimeout(function(){ confetti(); celebrate(); addXp(reward,'wheel',true);
+            btn.textContent=T('ربحت','You won')+' +'+reward+' XP 🎉';
+            var pn=document.querySelector('.elg-panel'); if(pn && pn.classList.contains('on')) renderPanel();
+            setTimeout(function(){ ov.classList.remove('on'); setTimeout(function(){ ov.remove(); },340); }, 1900);
+          }, 4300);
+        });
+        ov.addEventListener('click', function(e){ if(e.target===ov && spun){ ov.classList.remove('on'); setTimeout(function(){ ov.remove(); },340); } });
+      }catch(e){}
+    }
+
+    /* ---------- guided first-time tour (spotlight coach-marks) ---------- */
+    var TOUR=[
+      {sel:null, ic:'👋', ar:'جولة سريعة',  en:'Quick tour',      dar:'دعنا نتعرّف على الموقع في أقل من دقيقة.', den:'Let’s explore the site in under a minute.'},
+      {sel:['a[href="create-profile.html"]'], ic:'🪪', ar:'أنشئ بطاقتك', en:'Create your card', dar:'اصنع بطاقة تعريف احترافية بلمسة واحدة، بتصاميم أنيقة.', den:'Build a professional ID card in one tap, with elegant designs.'},
+      {sel:['a[href="create-blog.html"]'],   ic:'📝', ar:'ابدأ مدونتك',  en:'Start a blog',    dar:'أطلق مدونتك بتصاميم جاهزة وشاركها مع العالم.', den:'Launch your blog with ready designs and share it.'},
+      {sel:['a[href="explore.html"]'],       ic:'🔎', ar:'استكشف',       en:'Explore',         dar:'شاهد إبداعات الآخرين واستلهم أفكارك.', den:'Discover others’ creations and get inspired.'},
+      {sel:['a[href="hub.html"]','#hubLink','#hubCta'], ic:'🗂️', ar:'لوحتك', en:'Your hub', dar:'كل ملفاتك ومدوناتك في مكان واحد منظّم.', den:'All your profiles and blogs in one organized place.'},
+      {sel:['.elg-orb'], ic:'🏆', ar:'تقدّمك ومكافآتك', en:'Progress & rewards', dar:'نقاطك، مستواك، إنجازاتك، عجلة الحظ، ومكافأتك اليومية — كلها هنا!', den:'Your XP, level, achievements, lucky wheel and daily reward — all here!'},
+      {sel:null, ic:'🎉', ar:'أنت جاهز!',   en:'You’re all set!', dar:'استمتع وابدأ الإبداع الآن.', den:'Enjoy and start creating now.'}
+    ];
+    function findEl(sels){ if(!sels) return null; for(var i=0;i<sels.length;i++){ try{ var e=document.querySelector(sels[i]); if(e){ var r=e.getBoundingClientRect(); if(r.width>0 && r.height>0 && r.bottom>0 && r.top<innerHeight+400) return e; } }catch(x){} } return null; }
+    function startTour(force){
+      try{
+        if(S.tourDone && !force) return; if(document.querySelector('.elg-tour')) return;
+        var steps=TOUR.filter(function(s){ return !s.sel || findEl(s.sel); });
+        if(!steps.length) return;
+        var i=0;
+        var ov=document.createElement('div'); ov.className='elg-tour';
+        ov.innerHTML='<div class="elg-spot"></div><div class="elg-tip"></div>';
+        document.body.appendChild(ov);
+        var spot=ov.querySelector('.elg-spot'), tip=ov.querySelector('.elg-tip');
+        function placeTip(r){
+          var tw=tip.offsetWidth||290, th=tip.offsetHeight||150, m=12, x, y;
+          if(!r){ x=(innerWidth-tw)/2; y=(innerHeight-th)/2; }
+          else { y=(r.bottom+m+th<innerHeight)?(r.bottom+m):Math.max(m,r.top-m-th);
+                 x=Math.min(Math.max(m, r.left+r.width/2-tw/2), innerWidth-tw-m); }
+          tip.style.left=x+'px'; tip.style.top=y+'px'; tip.style.opacity='1';
+        }
+        function fill(s){
+          tip.innerHTML='<div class="tt">'+(s.ic?s.ic+' ':'')+T(s.ar,s.en)+'</div><div class="td">'+T(s.dar,s.den)+'</div>'
+            +'<div class="tb"><span class="tp">'+(i+1)+' / '+steps.length+'</span>'
+            +'<button class="ts">'+T('تخطّي','Skip')+'</button>'
+            +'<button class="tn">'+(i>=steps.length-1?T('تمام 🎉','Done 🎉'):T('التالي ←','Next ←'))+'</button></div>';
+          tip.querySelector('.tn').onclick=function(){ SFX.click(); if(i>=steps.length-1) end(); else { i++; render(); } };
+          tip.querySelector('.ts').onclick=function(){ SFX.click(); end(); };
+        }
+        function render(){
+          var s=steps[i], el=s.sel?findEl(s.sel):null; SFX.whoosh();
+          fill(s);
+          if(el){ try{ el.scrollIntoView({behavior:'smooth',block:'center'}); }catch(x){}
+            setTimeout(function(){ var r=el.getBoundingClientRect(), pad=8; spot.style.display='block';
+              spot.style.left=(r.left-pad)+'px'; spot.style.top=(r.top-pad)+'px';
+              spot.style.width=(r.width+pad*2)+'px'; spot.style.height=(r.height+pad*2)+'px'; placeTip(r); }, 340);
+          } else { spot.style.display='none'; placeTip(null); }
+        }
+        function end(){ SFX.close(); S.tourDone=true; save(); ov.classList.add('out'); setTimeout(function(){ ov.remove(); },260); }
+        render();
+      }catch(e){}
+    }
+    window.elgTour = function(){ try{ startTour(true); }catch(e){} };
+
+    /* ---------- activity energy (rewards time spent USING the site — not ads) ---------- */
+    var _lastActive=Date.now(); var ENERGY_GOAL=8;
+    function ensureEnergy(){ S.energy=S.energy||{prog:0,claims:0,day:null}; var d=todayStr(); if(S.energy.day!==d){ S.energy.day=d; S.energy.claims=0; } return S.energy; }
+    function energyReady(){ return ensureEnergy().prog>=ENERGY_GOAL; }
+    function energyReward(){ return 15 + Math.min(45, ensureEnergy().claims*5); }
+    function tickEnergy(){
+      try{ if(document.visibilityState && document.visibilityState!=='visible') return;
+        if(Date.now()-_lastActive>75000) return;               // idle guard: must be genuinely active
+        var e=ensureEnergy(); if(e.prog<ENERGY_GOAL){ e.prog++; save();
+          if(e.prog>=ENERGY_GOAL){ popToast('⚡', T('طاقتك امتلأت — اجمع مكافأتك!','Energy full — claim it!')); haptic(20); SFX.success(); notifyOS('⚡ '+T('طاقتك امتلأت!','Energy full!'), T('عُد واجمع مكافأتك من elgoharyX','Come claim your reward on elgoharyX')); }
+          updateDot(); var pn=document.querySelector('.elg-panel'); if(pn&&pn.classList.contains('on')) renderPanel();
+        }
+      }catch(x){}
+    }
+    function claimEnergy(){ var e=ensureEnergy(); if(e.prog<ENERGY_GOAL) return; var r=energyReward();
+      e.prog=0; e.claims++; save(); confetti(); SFX.reward(); haptic([12,30,12]); addXp(r,'energy',true); popToast('⚡', T('طاقة','Energy')+' +'+r+' XP'); updateDot(); }
+
+    /* ---------- mini-game: catch the stars (keeps the visitor on the page) ---------- */
+    function gameCapLeft(){ S.gcap=S.gcap||{day:null,earned:0}; var d=todayStr(); if(S.gcap.day!==d){ S.gcap.day=d; S.gcap.earned=0; } return Math.max(0,150-S.gcap.earned); }
+    function openGame(){
+      try{
+        if(document.querySelector('.elg-gamewrap')) return;
+        var ov=document.createElement('div'); ov.className='elg-ov elg-gamewrap';
+        ov.innerHTML='<div class="elg-card" style="width:340px"><div class="elg-emoji">🎮</div><h3>'+T('اصطياد النجوم','Catch the Stars')+'</h3>'
+          +'<div class="elg-gbar"><span>⏱️ <b id="elgGt">20</b></span><span>⭐ <b id="elgGs">0</b></span></div>'
+          +'<div class="elg-game" id="elgGame"></div>'
+          +'<button class="elg-btn elg-gstart">'+T('ابدأ 🎯','Start 🎯')+'</button>'
+          +'<button class="elg-skip elg-gclose">'+T('إغلاق','Close')+'</button></div>';
+        document.body.appendChild(ov); requestAnimationFrame(function(){ ov.classList.add('on'); }); SFX.whoosh();
+        var area=ov.querySelector('#elgGame'), sEl=ov.querySelector('#elgGs'), tEl=ov.querySelector('#elgGt');
+        var running=false, score=0, tLeft=20, spawnT=null, tickT=null, fallTimers=[];
+        function clearAll(){ if(spawnT) clearInterval(spawnT); if(tickT) clearInterval(tickT); fallTimers.forEach(clearInterval); fallTimers=[]; }
+        function end(){ running=false; clearAll(); area.innerHTML='';
+          var xp=Math.min(gameCapLeft(), Math.min(70, score*2)); if(xp>0){ S.gcap.earned+=xp; save(); confetti(); SFX.reward(); haptic([12,30,12]); addXp(xp,'game',true); }
+          var b=ov.querySelector('.elg-gstart'); b.style.display=''; b.disabled=false;
+          b.textContent=(xp>0? T('ربحت','You got')+' +'+xp+' XP · ':'')+T('العب مجددًا','Play again');
+        }
+        function spawn(){ if(!running) return; var s=document.createElement('div'); s.className='elg-star';
+          var gem=Math.random()<0.14; s.textContent=gem?'💎':'⭐'; s.style.left=(6+Math.random()*84)+'%'; s.style.top='-12%';
+          area.appendChild(s); var y=-12, sp=0.9+Math.random()*1.5;
+          var f=setInterval(function(){ y+=sp; s.style.top=y+'%'; if(y>102){ clearInterval(f); s.remove(); } },16); fallTimers.push(f);
+          s.addEventListener('pointerdown', function(ev){ ev.stopPropagation(); score+=gem?5:1; sEl.textContent=score; SFX.coin(); haptic(8);
+            clearInterval(f); s.style.transform='scale(1.7)'; s.style.opacity='0'; setTimeout(function(){ s.remove(); },150); });
+        }
+        ov.querySelector('.elg-gstart').addEventListener('click', function(){ if(running) return;
+          if(gameCapLeft()<=0){ popToast('🎮', T('وصلت حدّ اليوم — عُد غدًا للمزيد','Daily game cap reached — back tomorrow')); }
+          running=true; score=0; tLeft=20; sEl.textContent='0'; tEl.textContent='20'; this.style.display='none';
+          spawnT=setInterval(spawn, 620); tickT=setInterval(function(){ tLeft--; tEl.textContent=tLeft; if(tLeft<=0) end(); },1000); });
+        function close(){ clearAll(); ov.classList.remove('on'); setTimeout(function(){ ov.remove(); },340); }
+        ov.querySelector('.elg-gclose').addEventListener('click', close);
+        ov.addEventListener('click', function(e){ if(e.target===ov) close(); });
+      }catch(e){}
+    }
+
+    /* ---------- rewards economy: coins + store + cosmetics ---------- */
+    function addCoins(n){ n=Math.max(0,Math.ceil(n||0)); if(!n) return; S.coins=(S.coins||0)+n; save(); }
+    function boostActive(){ return (S.boostUntil||0) > Date.now(); }
+    function owned(id){ return !!(S.owned && S.owned[id]); }
+    var STORE=[
+      {id:'unlock_designs', ic:'🎨', ar:'فتح كل التصاميم المدفوعة', en:'Unlock ALL premium designs', dar:'افتح كل تخطيطات البروفايل وألوانه وتصاميم المدونة المدفوعة — دائمًا', den:'Unlock every premium profile layout, color & blog design — forever', cost:600, type:'unlock'},
+      {id:'boost',     ic:'⚡', ar:'مضاعفة النقاط ×2',  en:'2× XP boost',    dar:'كل نقاطك ×2 لمدة 15 دقيقة',        den:'Double all XP for 15 minutes',       cost:80,  type:'boost'},
+      {id:'spin',      ic:'🎡', ar:'لفّة إضافية',       en:'Extra spin',     dar:'أعد تفعيل عجلة الحظ فورًا',          den:'Unlock another wheel spin now',      cost:45,  type:'spin'},
+      {id:'chest',     ic:'🎁', ar:'صندوق فوري',        en:'Instant chest',  dar:'افتح صندوق مكافأة فوريًا (+60)',     den:'Open an instant reward chest (+60)', cost:60,  type:'chest'},
+      {id:'mega',      ic:'🚀', ar:'مضاعفة النقاط ×3',  en:'3× XP boost',    dar:'كل نقاطك ×3 لمدة 10 دقائق',         den:'Triple all XP for 10 minutes',       cost:140, type:'mega'},
+      {id:'energyfill',ic:'🔋', ar:'ملء الطاقة فورًا',  en:'Instant energy', dar:'املأ شريط الطاقة وجهّز مكافأته',     den:'Fill your energy bar instantly',     cost:40,  type:'energyfill'},
+      {id:'streakfreeze',ic:'🧊',ar:'تجميد السلسلة',    en:'Streak freeze',  dar:'يحمي سلسلتك إذا فوّتّ يومًا',         den:'Protects your streak if you miss a day', cost:110, type:'streakfreeze'},
+      {id:'mystery',   ic:'🎲', ar:'صندوق الغموض',      en:'Mystery box',    dar:'مكافأة عشوائية (20–200 نقطة)',       den:'Random reward (20–200 XP)',          cost:70,  type:'mystery'},
+      {id:'th_gold',   ic:'👑', ar:'ثيم ذهبي للكرة',    en:'Gold orb theme', dar:'مظهر ذهبي فاخر دائم لكرتك',          den:'Permanent luxe gold orb',            cost:120, type:'theme'},
+      {id:'th_neon',   ic:'🌈', ar:'ثيم نيون',          en:'Neon theme',     dar:'توهّج نيون دائم لكرتك',              den:'Permanent neon glow orb',            cost:150, type:'theme'},
+      {id:'th_emerald',ic:'💚', ar:'ثيم زمرّدي',        en:'Emerald theme',  dar:'مظهر زمرّدي دائم لكرتك',            den:'Permanent emerald orb',              cost:150, type:'theme'},
+      {id:'th_royal',  ic:'🔮', ar:'ثيم ملكي',          en:'Royal theme',    dar:'توهّج بنفسجي ملكي دائم',            den:'Permanent royal purple orb',         cost:150, type:'theme'},
+      {id:'th_sunset', ic:'🌅', ar:'ثيم الغروب',        en:'Sunset theme',   dar:'تدرّج غروب دافئ دائم',              den:'Permanent warm sunset orb',          cost:150, type:'theme'},
+      {id:'customcolor',ic:'🎨', ar:'لون مخصّص للكرة',   en:'Custom orb color', dar:'اختر أي لون تريده لكرتك — يمكنك تغييره لاحقًا', den:'Pick any color for your orb — change it anytime', cost:200, type:'customcolor'},
+      {id:'bdg_fire',   ic:'🔥', ar:'شارة اللهب',        en:'Fire badge',     dar:'شارة لهب تظهر بجانب رتبتك',          den:'A fire badge shown by your rank',    cost:90,  type:'badge'},
+      {id:'bdg_diamond',ic:'💎', ar:'شارة الألماس',      en:'Diamond badge',  dar:'شارة ألماس فاخرة بجانب رتبتك',       den:'A luxe diamond badge by your rank',  cost:120, type:'badge'},
+      {id:'bdg_crown',  ic:'👑', ar:'شارة التاج',        en:'Crown badge',    dar:'شارة تاج ملكية بجانب رتبتك',         den:'A royal crown badge by your rank',   cost:160, type:'badge'}
+    ];
+    function hexA(h,a){ try{ h=String(h).replace('#',''); if(h.length===3) h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2]; var n=parseInt(h,16); return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }catch(e){ return 'rgba(208,170,78,'+a+')'; } }
+    function applyCosmetics(){ var orb=document.querySelector('.elg-orb'); if(!orb) return;
+      ['gold','neon','emerald','royal','sunset'].forEach(function(t){ orb.classList.remove('elg-th-'+t); });
+      orb.style.borderColor=''; orb.style.boxShadow='';
+      var lv=orb.querySelector('.elg-lv');
+      if(S.orbTheme==='custom' && S.orbColor){
+        orb.style.borderColor=S.orbColor; orb.style.boxShadow='0 0 18px '+hexA(S.orbColor,0.55)+',0 8px 26px rgba(0,0,0,.45)';
+        if(lv) lv.style.color=S.orbColor;
+      } else { if(lv) lv.style.color=''; if(S.orbTheme && String(S.orbTheme).indexOf('th_')===0) orb.classList.add('elg-th-'+String(S.orbTheme).replace('th_','')); }
+    }
+    function openColorPicker(){
+      try{
+        if(document.querySelector('.elg-colorwrap')) return;
+        var cur=S.orbColor||'#d0aa4e', presets=['#d0aa4e','#7de3ff','#37d99a','#a074e6','#ff9e5e','#ff5d8f','#5b8cff','#ffd84d'];
+        var ov=document.createElement('div'); ov.className='elg-ov elg-colorwrap';
+        ov.innerHTML='<div class="elg-card" style="width:320px"><div class="elg-emoji">🎨</div><h3>'+T('لون كرتك','Your orb color')+'</h3>'
+          +'<input type="color" class="elg-cpick" value="'+cur+'" style="width:64px;height:64px;border:0;background:none;cursor:pointer">'
+          +'<div class="elg-cpresets">'+presets.map(function(c){ return '<span class="elg-cp" data-c="'+c+'" style="background:'+c+'"></span>'; }).join('')+'</div>'
+          +'<button class="elg-btn elg-capply">'+T('تطبيق','Apply')+'</button><button class="elg-skip elg-cclose">'+T('إغلاق','Close')+'</button></div>';
+        document.body.appendChild(ov); requestAnimationFrame(function(){ ov.classList.add('on'); }); SFX.whoosh();
+        var pick=ov.querySelector('.elg-cpick');
+        ov.querySelectorAll('.elg-cp').forEach(function(sp){ sp.onclick=function(){ pick.value=sp.dataset.c; }; });
+        function close(){ ov.classList.remove('on'); setTimeout(function(){ ov.remove(); },320); var pn=document.querySelector('.elg-panel'); if(pn&&pn.classList.contains('on')) renderPanel(); }
+        ov.querySelector('.elg-capply').onclick=function(){ S.orbTheme='custom'; S.orbColor=pick.value; save(); applyCosmetics(); confetti(); SFX.reward(); haptic(15); popToast('🎨', T('تم تطبيق لونك','Your color applied')); close(); };
+        ov.querySelector('.elg-cclose').onclick=close;
+        ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+      }catch(e){}
+    }
+    function buyItem(item){
+      try{
+        if(item.type==='theme' && owned(item.id)){ S.orbTheme=item.id; save(); applyCosmetics(); SFX.click(); popToast(item.ic, T('تم تفعيل الثيم','Theme applied')); return; }
+        if(item.type==='unlock' && owned(item.id)){ return; }              // one-time, already owned
+        if(item.type==='customcolor' && owned(item.id)){ SFX.click(); openColorPicker(); return; }   // change color anytime
+        if(item.type==='badge' && owned(item.id)){ return; }
+        if((S.coins||0) < item.cost){ popToast('🪙', T('نقودك غير كافية','Not enough coins')); SFX.error(); haptic(30); return; }
+        S.coins -= item.cost;
+        if(item.type==='boost'){ S.boostUntil=Date.now()+15*60000; S.boostMult=2; }
+        else if(item.type==='mega'){ S.boostUntil=Date.now()+10*60000; S.boostMult=3; }
+        else if(item.type==='spin'){ S.spin={last:null}; }
+        else if(item.type==='chest'){ addXp(60,'store_chest',true); }
+        else if(item.type==='energyfill'){ ensureEnergy(); S.energy.prog=ENERGY_GOAL; }
+        else if(item.type==='streakfreeze'){ S.streakFreeze=(S.streakFreeze||0)+1; }
+        else if(item.type==='mystery'){ var mr=20+Math.floor(Math.random()*181); setTimeout(function(){ addXp(mr,'mystery'); popToast('🎲', T('صندوق الغموض','Mystery box')+' +'+mr+' XP'); },80); }
+        else if(item.type==='theme'){ S.owned=S.owned||{}; S.owned[item.id]=1; S.orbTheme=item.id; applyCosmetics(); }
+        else if(item.type==='customcolor'){ S.owned=S.owned||{}; S.owned[item.id]=1; setTimeout(openColorPicker,140); }
+        else if(item.type==='badge'){ S.owned=S.owned||{}; S.owned[item.id]=1; }
+        else if(item.type==='unlock'){ S.owned=S.owned||{}; S.owned[item.id]=1; try{ localStorage.setItem('elg_designs_unlocked','1'); }catch(e){} }
+        save(); confetti(); SFX.reward(); haptic([12,30,12]); updateDot();
+        popToast(item.ic, T('تم الشراء','Purchased')+' · '+T(item.ar,item.en));
+      }catch(e){}
+    }
+    function openStore(){
+      try{
+        if(document.querySelector('.elg-storewrap')) return;
+        var ov=document.createElement('div'); ov.className='elg-ov elg-storewrap';
+        function rows(){ return STORE.map(function(it){
+          var own=owned(it.id), active=(S.orbTheme===it.id), afford=(S.coins||0)>=it.cost;
+          var btn;
+          if(it.type==='theme'){ btn = active?'<button class="si-buy owned">✓ '+T('مُفعّل','Active')+'</button>'
+            : own?'<button class="si-buy active" data-buy="'+it.id+'">'+T('تفعيل','Use')+'</button>'
+            : '<button class="si-buy" data-buy="'+it.id+'">🪙 '+it.cost+'</button>'; }
+          else if(it.type==='customcolor' && own){ btn='<button class="si-buy active" data-buy="'+it.id+'">🎨 '+T('تغيير','Change')+'</button>'; }
+          else if((it.type==='unlock'||it.type==='badge') && own){ btn='<button class="si-buy owned">✓ '+T('مملوك','Owned')+'</button>'; }
+          else { btn='<button class="si-buy" data-buy="'+it.id+'">🪙 '+it.cost+'</button>'; }
+          return '<div class="elg-si'+((!afford && !own && !active)?' dim':'')+'"><div class="si-ic">'+it.ic+'</div>'
+            +'<div class="si-b"><div class="si-t">'+T(it.ar,it.en)+'</div><div class="si-d">'+T(it.dar,it.den)+'</div></div>'+btn+'</div>';
+        }).join(''); }
+        function render(){ ov.querySelector('.elg-store-list').innerHTML=rows();
+          ov.querySelector('.elg-scoins').textContent=(S.coins||0);
+          ov.querySelectorAll('[data-buy]').forEach(function(b){ b.onclick=function(){ var it=STORE.filter(function(x){return x.id===b.dataset.buy;})[0]; if(it){ buyItem(it); render(); } }; }); }
+        ov.innerHTML='<div class="elg-card" style="width:360px"><div class="elg-emoji">🛍️</div><h3>'+T('متجر المكافآت','Rewards Store')+'</h3>'
+          +'<div style="font-weight:800;color:#ffd77a;margin:-4px 0 6px">🪙 <span class="elg-scoins">0</span> '+T('نقود','coins')+'</div>'
+          +'<div class="elg-store-list"></div><button class="elg-skip elg-sclose">'+T('إغلاق','Close')+'</button></div>';
+        document.body.appendChild(ov); requestAnimationFrame(function(){ ov.classList.add('on'); }); SFX.whoosh();
+        render();
+        var close=function(){ ov.classList.remove('on'); setTimeout(function(){ ov.remove(); },340); var pn=document.querySelector('.elg-panel'); if(pn&&pn.classList.contains('on')) renderPanel(); };
+        ov.querySelector('.elg-sclose').addEventListener('click', close);
+        ov.addEventListener('click', function(e){ if(e.target===ov) close(); });
+      }catch(e){}
+    }
+    window.elgStore = function(){ try{ openStore(); }catch(e){} };
+
+    /* ---------- device (OS) notifications for rewards & reminders ---------- */
+    var ELG_LOGO='https://i.ibb.co/1t1TCvH7/103777.png';
+    function notifCap(){ return ('Notification' in window); }
+    function notifyOS(title, body){
+      try{
+        if(!notifCap() || Notification.permission!=='granted' || !S.osNotif) return;
+        var opts={ body:body||'', icon:ELG_LOGO, badge:ELG_LOGO, tag:'elg-reward', dir:RTL?'rtl':'ltr', lang:L };
+        if(navigator.serviceWorker && navigator.serviceWorker.ready){
+          navigator.serviceWorker.ready.then(function(reg){ try{ reg.showNotification(title,opts); }catch(e){ try{ new Notification(title,opts); }catch(x){} } })
+          .catch(function(){ try{ new Notification(title,opts); }catch(x){} });
+        } else { try{ new Notification(title,opts); }catch(e){} }
+      }catch(e){}
+    }
+    function askNotif(){
+      try{
+        if(typeof window.elgPushPrompt==='function'){   // OneSignal configured → subscribe for push even when site is closed
+          window.elgPushPrompt(); S.osNotif=true; save(); SFX.success(); haptic(20);
+          popToast('🔔', T('اسمح بالإشعارات من النافذة لتصلك حتى والموقع مغلق','Allow notifications to get them even when the site is closed'));
+          var pnl=document.querySelector('.elg-panel'); if(pnl&&pnl.classList.contains('on')) renderPanel(); return;
+        }
+        if(!notifCap()){ popToast('🔔', T('جهازك لا يدعم التنبيهات','Notifications not supported here')); return; }
+        Notification.requestPermission().then(function(p){
+          if(p==='granted'){ S.osNotif=true; save(); SFX.success(); haptic(20);
+            notifyOS(T('تم تفعيل التنبيهات! 🔔','Notifications enabled! 🔔'), T('سنذكّرك بمكافآتك وجديد الموقع','We’ll remind you about your rewards & updates'));
+            popToast('🔔', T('تم تفعيل التنبيهات على جهازك','Device notifications enabled'));
+          } else { popToast('🔕', T('لم يتم السماح بالتنبيهات','Notifications not allowed')); }
+          var pn=document.querySelector('.elg-panel'); if(pn&&pn.classList.contains('on')) renderPanel();
+        });
+      }catch(e){}
+    }
+
+    /* ---------- daily motivational message (in-app, once per day) ---------- */
+    var MOTIV=[
+      {ar:'كل يوم فرصة جديدة لتتألّق ✨',            en:'Every day is a new chance to shine ✨'},
+      {ar:'إبداعك اليوم يصنع فرقك غدًا 🚀',          en:'Today’s creativity shapes your tomorrow 🚀'},
+      {ar:'استمر — أنت أقرب مما تظن 💪',            en:'Keep going — you’re closer than you think 💪'},
+      {ar:'خطوة صغيرة كل يوم = إنجاز كبير 🌱',       en:'A small step daily = a big achievement 🌱'},
+      {ar:'بروفايلك ومدونتك يستحقّان التميّز — أكملهما اليوم 🎨', en:'Your profile & blog deserve to shine — finish them today 🎨'},
+      {ar:'النجاح عادة… وعودتك اليوم بدايتها 🔥',    en:'Success is a habit — your visit today builds it 🔥'},
+      {ar:'شارك إبداعك مع العالم، فالعالم بانتظارك 🌍', en:'Share your work with the world — it’s waiting 🌍'},
+      {ar:'أنت تصنع شيئًا يدوم — فخورون بك 🏆',      en:'You’re building something lasting — proud of you 🏆'}
+    ];
+    function showDailyMotivation(){
+      try{ var d=todayStr(); if(S.motivDay===d) return; S.motivDay=d; save();
+        var seed=d.split('-').reduce(function(a,b){ return a+parseInt(b,10); },0);
+        var m=MOTIV[Math.abs(seed)%MOTIV.length];
+        setTimeout(function(){ popToast('🌟', T(m.ar,m.en)); }, 2400);
+      }catch(e){}
+    }
+
+    /* ---------- boot ---------- */
+    function boot(){
+      try{
+        buildOrb(); hookActions(); tickDay(); trackPage(); ensureMissions(); ensureWeek(); applyCosmetics(); updateDot(); showDailyMotivation();
+        ['pointerdown','keydown','scroll','touchstart'].forEach(function(ev){ try{ addEventListener(ev, function(){ _lastActive=Date.now(); }, {passive:true}); }catch(x){} });
+        setInterval(tickEnergy, 20000);
+        if(!S.seenWelcome){ S.seenWelcome=true; save(); setTimeout(showWelcome, 700); }
+        checkAch();
+        // gentle time-on-site reward + time mission (per minute of open time)
+        setInterval(function(){ awardOncePer('time', 180000, 5); missionProgress('time'); }, 60000);
+      }catch(e){ /* never break the site */ }
+    }
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+  }catch(e){ /* engagement engine failed silently — site unaffected */ }
+})();
+
+/* ============================================================================
+   ONESIGNAL WEB PUSH — free notifications that reach the user's device screen
+   EVEN WHEN THE SITE IS CLOSED. No paid server needed (OneSignal is the sender).
+
+   SETUP (one-time, by the site owner):
+     1) Create a FREE account at https://onesignal.com  → New App/Website
+     2) Platform: "Web" → Site URL: https://ex-eg.github.io/eg2  (typical config)
+        (if you serve from the root domain instead, use https://ex-eg.github.io)
+     3) Choose "Custom code" integration. Copy your OneSignal **App ID**.
+     4) Paste it into ONESIGNAL_APP_ID below, and re-upload app.js.
+     5) Upload the folder  eg2/onesignal/OneSignalSDKWorker.js  too.
+   Then OneSignal shows a subscribe prompt; you send notifications from its
+   dashboard (or schedule them) and they appear on phones even when closed.
+   ========================================================================== */
+(function(){
+  try{
+    var ONESIGNAL_APP_ID = 'YOUR_ONESIGNAL_APP_ID';   // ← paste your OneSignal App ID here
+    if(!ONESIGNAL_APP_ID || ONESIGNAL_APP_ID.indexOf('YOUR_')===0) return;  // not configured yet → do nothing
+    // OneSignal SW lives under /onesignal/ so it never clashes with sw.js.
+    var base = location.pathname.replace(/[^/]*$/,'');          // current directory (e.g. /eg2/)
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    var sc = document.createElement('script');
+    sc.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'; sc.defer = true;
+    document.head.appendChild(sc);
+    window.OneSignalDeferred.push(async function(OneSignal){
+      try{
+        await OneSignal.init({
+          appId: ONESIGNAL_APP_ID,
+          serviceWorkerParam: { scope: base + 'onesignal/' },
+          serviceWorkerPath: 'onesignal/OneSignalSDKWorker.js',
+          allowLocalhostAsSecureOrigin: true
+        });
+        window.__elgPush = OneSignal;   // let the engagement bell trigger the prompt
+      }catch(e){ console.warn('OneSignal init skipped:', e); }
+    });
+    // let the "🔔 enable device alerts" button (engagement panel) open OneSignal's prompt
+    window.elgPushPrompt = function(){ try{ window.OneSignalDeferred.push(function(OneSignal){ try{ OneSignal.Slidedown.promptPush(); }catch(e){ try{ OneSignal.Notifications.requestPermission(); }catch(x){} } }); }catch(e){} };
+  }catch(e){ /* push init failed silently — site unaffected */ }
+})();
