@@ -2194,17 +2194,12 @@
     .adm-citem{flex-wrap:wrap}
   }
 
-  /* ===== إعلانات AdSense (.elg-ad) ===== */
-  .elg-ad{max-width:900px;margin:26px auto;padding:0 16px;text-align:center;clear:both}
-  .elg-ad:not([data-done]){display:none}          /* مخفي قبل تحميل الإعلان — لا فراغات */
-  .elg-ad .elg-ad-lbl{display:block;font-family:"Space Grotesk",sans-serif;font-size:10.5px;
-    letter-spacing:1.5px;text-transform:uppercase;color:var(--muted-2,#8892a6);margin-bottom:6px}
-  .elg-ad ins{display:block;min-height:0}
-  .elg-ad ins[data-ad-status="unfilled"]{display:none!important}      /* لا يوجد إعلان الآن */
-  .elg-ad:has(ins[data-ad-status="unfilled"]) .elg-ad-lbl{display:none}
-  /* داخل المقالة: هامش أنسب */
+  /* ===== AdSense frames · إعلانات =====
+     Moved to assets/brand.css so the ad frame lives next to the rules that
+     decide whether an ad may exist at all. Only the two structural hooks the
+     app markup relies on stay here. */
   .article-view .elg-ad{margin:34px auto}
-  /* أخفِ قسم الإعلان في الصفحة الرئيسية تمامًا ما لم يظهر إعلان فعلي (لا فراغات) */
+  /* the home page ad section collapses entirely unless a real ad filled it */
   .elg-ad-sec:has(.elg-ad:not([data-done])){display:none}
   .elg-ad-sec:has(ins[data-ad-status="unfilled"]){display:none}
 

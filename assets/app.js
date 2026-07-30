@@ -16,10 +16,16 @@ import {
   urlProfileView, urlProfileEdit, urlBlogView, urlBlogEdit, gotoLogin,
   LOGO, SUN, MOON, UICON, TAB,
   $, esc, toast, initials, setMeta, seoFor, renderError, fatalError,
+  setCanonical, setRobots, noAdsHere, OG_IMAGE, mark, tile, lockup, seal,
   shortId, uniqueShortId, uniqueUserId, shorten
 } from './core.js';
 import { uploadToImgbb, loadImageKeys, saveImageKeys, clearImageKeysCache, currentImageKeys } from './imagehost.js';
 import { logVisit, startPresence, captureReferral, recordReferralIfPending, referralCount } from './site.js';
+import {
+  isCustomHost, normalizeDomain, newDomainToken, txtRecordName, txtRecordValue,
+  verifyDomainOwnership, resolveHostToBlog, domainOwner, linkDomain, unlinkDomain,
+  canonicalBlogUrl, ORIGIN_HOST
+} from './domains.js';
 
   const TEMPLATES = [
     {id:'royal',    name:t('الكلاسيكي','Classic')},
@@ -524,6 +530,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
   const markUnlocked=(kind,id)=>{ try{ sessionStorage.setItem(unlockKey(kind,id),'1'); }catch{} };
   /* Renders a lock screen into #app; calls onUnlock() once the password matches. */
   function showPassGate(kind,id,rec,onUnlock){
+    setRobots(false); noAdsHere();   // a locked page has no content to index or monetise
     if(wasUnlocked(kind,id)){ onUnlock(); return; }
     document.body.style.background='';
     document.title=t('محتوى محمي — elgoharyX','Protected Content — elgoharyX');
@@ -629,7 +636,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
     const premiumCls = (currentUser && currentUser.premium) ? ' ab-premium' : '';
     const langBtn = `<button class="lang-toggle ab-lang" data-act="lang" aria-label="Language"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg><span class="lt-label"></span></button>`;
     return `<div class="appbar${premiumCls}">
-      <a class="brand" href="${urlHome()}" style="text-decoration:none;color:inherit"><span class="mark"><img src="${LOGO}" alt="elgoharyX"/></span>
+      <a class="brand" href="${urlHome()}" style="text-decoration:none;color:inherit"><span class="mark">${mark({size:20})}</span>
         Academic Profiles <span class="ar">${t('· منشئ البروفايلات','· Profile Builder')}</span></a>
       <div class="ab-right">${langBtn}${right}</div>
     </div>`;
@@ -641,7 +648,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
       <div class="drawer-bg" data-act="menu-close"></div>
       <aside class="drawer">
         <div class="drawer-brand">
-          <span class="db-mark"><img src="${LOGO}" alt="elgoharyX"/></span>
+          <span class="db-mark">${mark({size:20})}</span>
           <div class="db-t"><b>Academic Profiles</b><span>${t('منشئ البروفايلات','Profile Builder')} · elgoharyX</span></div>
           <button class="dr-x" data-act="menu-close" aria-label="${t('إغلاق','Close')}">${TAB.x}</button>
         </div>
@@ -670,7 +677,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
           <div class="dr-sep"></div>
           <button class="dr-item danger" data-act="logout">${TAB.logout}<span>${t('تسجيل الخروج','Log out')}</span></button>
         </nav>
-        <div class="drawer-foot"><img src="${LOGO}" alt="elgoharyX"/><span>© 2026 <b>elgoharyX</b> — ${t('جميع الحقوق محفوظة','All rights reserved')}</span></div>
+        <div class="drawer-foot"><span class="dr-foot-mark">${tile({size:22,radius:7})}</span><span>© 2026 <b>elgoharyX</b> — ${t('جميع الحقوق محفوظة','All rights reserved')}</span></div>
       </aside>
     </div>`;
   }
@@ -1736,6 +1743,12 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
       const d = snap.val();
       const paintProfile=()=>{
         seoFor(d);
+        setCanonical(urlProfileView(id));
+        /* A card with only a name is thin content: keep it out of the index and
+           off the ad inventory. */
+        const substance = [d.about,d.role,d.org,d.bio].filter(Boolean).join(' ').trim();
+        setRobots(substance.length >= 120);
+        if(substance.length < 120) noAdsHere();
         document.body.style.background = PAGE_BG[d.template]||'#0c1424';
         $('#app').innerHTML = `<div class="viewer">${renderCard(d)}<div class="elg-ad" data-ad="profile"></div></div>`;
         wireCopy($('#app')); wire3D($('#app'));
@@ -2076,13 +2089,33 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
     }
   }
   const blogFrameClass = d => (d && d.frame && /^[a-z0-9]{1,16}$/i.test(d.frame) && d.frame!=='none') ? ' blog-fr blog-fr-'+d.frame : '';
-  function blogShell(d){
+  /**
+   * Shared chrome for both blog views: palette, title, meta, canonical, robots.
+   * @param {object} d        the blog record
+   * @param {string} [id]     blog id — needed to build the canonical URL
+   * @param {number} [postIdx] article index when rendering a single article
+   */
+  function blogShell(d, id, postIdx){
     const dz = blogDesign(d.design);
     document.body.style.background = dz.bg;
     document.title = (d.title||t('مدونة','Blog'))+' — elgoharyX';
     setMeta('meta[name="description"]','content',(d.subtitle||d.about||t('مدونة احترافية','A professional blog')).slice(0,155));
     setMeta('meta[property="og:title"]','content',(d.title||t('مدونة','Blog'))+' | elgoharyX');
-    setMeta('meta[property="og:image"]','content',d.cover||LOGO);
+    setMeta('meta[property="og:image"]','content',d.cover||OG_IMAGE);
+    if(id){
+      /* Every blog used to declare the same canonical (blog.html), which told
+         Google that thousands of distinct blogs were one duplicated page. Now
+         each one points at its own URL — its custom domain when it has one. */
+      const platform = postIdx!=null
+        ? pageUrl('blog.html','blog='+encodeURIComponent(id)+'&post='+encodeURIComponent(postIdx))
+        : urlBlogView(id);
+      setCanonical(canonicalBlogUrl(d, id, platform, postIdx));
+      /* A blog with nothing published is not a page worth indexing, and it must
+         not carry an ad either. */
+      const published = blogPosts(d).length;
+      setRobots(published > 0);
+      if(!published) noAdsHere();
+    }
     return dz;
   }
   function blogTop(d,dz){
@@ -2240,7 +2273,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
   }
 
   function renderBlogIndex(id,d){
-    const dz = blogShell(d);
+    const dz = blogShell(d, id);
     const posts = blogPosts(d);
     const featured = posts[0];
     const rest = posts.slice(1);
@@ -2367,7 +2400,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
   }
 
   function renderArticle(id,d,idx){
-    const dz = blogShell(d);
+    const dz = blogShell(d, id, idx);
     const posts = blogPosts(d);
     const p = posts[idx]; if(!p){ renderBlogIndex(id,d); return; }
     document.title = (p.title||t('مقالة','Article'))+' — '+(d.title||t('مدونة','Blog'));
@@ -2458,10 +2491,169 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
           <button id="baEdit">${IC2.pen} ${t('تعديل بيانات المدونة','Edit Blog Details')}</button>
         </div>
       </div>
+      ${domainPanel(id,d)}
       <div class="badm-bar"><h3>${t('إدارة التدوينات','Manage Posts')}</h3>
         <button class="btn primary" id="baNew" style="width:auto;padding:10px 18px">${TAB.plus} ${t('مقال جديد','New Article')}</button></div>
       <div class="badm-posts" id="baPosts">${rows}</div>
     </div>`;
+  }
+
+
+  /* ---------- custom domain panel (blog admin) ----------
+     Three states, one card:
+       idle    → ask for the domain
+       pending → show the TXT record to publish, plus a Verify button
+       linked  → show the live domain, plus Disconnect
+     The DNS check happens in the browser over DNS-over-HTTPS; nothing here
+     needs a server. Logic lives in assets/domains.js. */
+  const DOM_IC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg>';
+  function domFieldRow(label, value, copyId){
+    return `<div class="dom-rec">
+      <span class="dom-rec-k">${esc(label)}</span>
+      <code class="dom-rec-v" dir="ltr">${esc(value)}</code>
+      <button class="dom-copy" data-copy="${esc(value)}" id="${copyId||''}" type="button"
+        title="${t('نسخ','Copy')}">${IC2.link} ${t('نسخ','Copy')}</button>
+    </div>`;
+  }
+  function domainPanel(id,d){
+    const linked  = typeof d.domain==='string' && d.domain ? d.domain : '';
+    const pending = typeof d.domainPending==='string' && d.domainPending ? d.domainPending : '';
+    const token   = typeof d.domainToken==='string' ? d.domainToken : '';
+    const badge = linked
+      ? `<span class="dom-badge ok">${t('مربوط','Linked')}</span>`
+      : pending ? `<span class="dom-badge wait">${t('بانتظار التحقّق','Awaiting verification')}</span>`
+                : `<span class="dom-badge off">${t('غير مربوط','Not linked')}</span>`;
+    let body;
+    if(linked){
+      body = `<div class="dom-live">
+          <a class="dom-live-url" href="https://${esc(linked)}/" target="_blank" rel="noopener" dir="ltr">https://${esc(linked)}/</a>
+          <p class="dom-help">${t('مدونتك تُخدَم الآن على دومينك. الرابط القديم يعمل أيضاً وكلاهما يشير إلى الدومين الخاص كرابط أساسي (canonical).','Your blog is now served on your domain. The old link still works, and both point at the custom domain as the canonical URL.')}</p>
+          <div class="dom-acts">
+            <button class="btn ghost" id="domOpenGuide" type="button">${t('دليل الإعداد','Setup guide')}</button>
+            <button class="btn del" id="domUnlink" type="button">${t('فصل الدومين','Disconnect domain')}</button>
+          </div>
+        </div>`;
+    } else if(pending && token){
+      body = `<div class="dom-steps">
+          <p class="dom-help">${t('أضِف سجل TXT التالي في لوحة الدومين','Add the following TXT record in your domain panel')} <b dir="ltr">${esc(pending)}</b>${t('، ثم اضغط «تحقّق». قد يستغرق انتشار السجل من دقائق إلى ساعة.',', then press Verify. The record can take from a few minutes to an hour to propagate.')}</p>
+          ${domFieldRow(t('النوع','Type'),'TXT')}
+          ${domFieldRow(t('الاسم / Host','Name / Host'), txtRecordName(pending))}
+          ${domFieldRow(t('القيمة','Value'), txtRecordValue(token))}
+          <div class="dom-msg" id="domMsg"></div>
+          <div class="dom-acts">
+            <button class="btn primary" id="domVerify" type="button">${t('تحقّق الآن','Verify now')}</button>
+            <button class="btn ghost" id="domOpenGuide" type="button">${t('دليل الإعداد','Setup guide')}</button>
+            <button class="btn del" id="domCancel" type="button">${t('إلغاء','Cancel')}</button>
+          </div>
+        </div>`;
+    } else {
+      body = `<div class="dom-start">
+          <p class="dom-help">${t('اكتب دومين تملكه (بدون https)، وسنعطيك سجل TXT واحداً لإثبات الملكية.','Type a domain you own (without https), and we will give you one TXT record to prove ownership.')}</p>
+          <div class="dom-row">
+            <input id="domInput" dir="ltr" placeholder="mudawana.com" autocomplete="off" spellcheck="false"/>
+            <button class="btn primary" id="domNext" type="button">${t('التالي','Next')}</button>
+          </div>
+          <div class="dom-msg" id="domMsg"></div>
+          <p class="dom-help">${t('لا تملك دومين؟ الميزة اختيارية تماماً ومدونتك تعمل على رابط elgoharyX.','No domain? The feature is entirely optional and your blog works on its elgoharyX link.')}
+            <a href="${pageUrl('custom-domain.html')}">${t('اقرأ الدليل الكامل','Read the full guide')}</a></p>
+        </div>`;
+    }
+    return `<section class="dom-card" id="domCard">
+      <div class="dom-head"><span class="dom-ic">${DOM_IC}</span>
+        <div class="dom-tt"><h3>${t('الدومين الخاص بمدونتك','Your blog\'s custom domain')}</h3>
+          <span class="sub">${t('اربط مدونتك بدومين تملكه — مجاناً','Connect your blog to a domain you own — free')}</span></div>
+        ${badge}</div>
+      ${body}
+    </section>`;
+  }
+  /** Wire the domain panel. `d` is mutated in place and `repaint` redraws. */
+  function wireDomainPanel(id,d,repaint){
+    const msg=(text,cls)=>{ const m=$('#domMsg'); if(m){ m.className='dom-msg '+(cls||''); m.textContent=text; } };
+    const DOM_ERR={
+      empty:    t('اكتب اسم الدومين','Enter the domain name'),
+      tooLong:  t('الدومين طويل جداً','The domain is too long'),
+      isIp:     t('لا يمكن استخدام عنوان IP','An IP address cannot be used'),
+      needDot:  t('اكتب دومين كاملاً مثل example.com','Enter a full domain such as example.com'),
+      badLabel: t('أحد أجزاء الدومين غير صالح','One part of the domain is invalid'),
+      badChars: t('يُسمح بالحروف والأرقام والشرطة فقط','Only letters, digits and hyphens are allowed'),
+      badTld:   t('امتداد الدومين غير صالح','The domain extension is invalid'),
+      reserved: t('هذا الدومين محجوز للمنصّة','That domain is reserved by the platform')
+    };
+    document.querySelectorAll('#domCard [data-copy]').forEach(b=>b.onclick=()=>{
+      try{ navigator.clipboard.writeText(b.dataset.copy); }catch(e){}
+      toast(t('تم النسخ ✓','Copied ✓'));
+    });
+    const guide=$('#domOpenGuide');
+    if(guide) guide.onclick=()=>{ location.href=pageUrl('custom-domain.html'); };
+
+    const next=$('#domNext');
+    if(next) next.onclick=async()=>{
+      const res=normalizeDomain($('#domInput').value);
+      if(!res.ok){ msg(DOM_ERR[res.code]||DOM_ERR.needDot); return; }
+      next.disabled=true; msg(t('جارٍ التحقّق من توفّر الدومين…','Checking whether the domain is available…'));
+      try{
+        const owner=await domainOwner(res.domain);
+        if(owner && owner.blog && owner.blog!==id){
+          msg(t('هذا الدومين مربوط بمدونة أخرى بالفعل.','That domain is already linked to another blog.'));
+          next.disabled=false; return;
+        }
+        d.domainPending=res.domain;
+        d.domainToken=d.domainToken||newDomainToken();
+        await update(ref(db,'blogs/'+id), { domainPending:d.domainPending, domainToken:d.domainToken, updatedAt:Date.now() });
+        repaint();
+      }catch(e){
+        console.error(e);
+        msg(t('تعذّر الحفظ — تأكد من نشر قواعد قاعدة البيانات.','Could not save — make sure the database rules are published.'));
+        next.disabled=false;
+      }
+    };
+
+    const verify=$('#domVerify');
+    if(verify) verify.onclick=async()=>{
+      const dom=d.domainPending; if(!dom) return;
+      verify.disabled=true; const old=verify.textContent;
+      verify.textContent=t('جارٍ القراءة من DNS…','Reading DNS…');
+      msg('');
+      try{
+        const r=await verifyDomainOwnership(dom, d.domainToken);
+        if(!r.ok){
+          msg(r.code==='dnsFail' ? t('تعذّر الوصول إلى خدمة DNS الآن — أعد المحاولة بعد قليل.','Could not reach the DNS service right now — try again shortly.')
+            : r.code==='missing' ? t('لم نجد أي سجل TXT على هذا الاسم بعد. الانتشار يستغرق وقتاً — أعد المحاولة بعد ١٥ دقيقة.','No TXT record found at that name yet. Propagation takes time — try again in 15 minutes.')
+            : t('وُجد سجل TXT لكن قيمته مختلفة. تأكد من نسخ القيمة كاملة.','A TXT record exists but its value differs. Make sure you copied the whole value.'));
+          verify.disabled=false; verify.textContent=old; return;
+        }
+        await linkDomain(dom, id, currentUser.uid);
+        await remove(ref(db,'blogs/'+id+'/domainPending')).catch(()=>{});
+        d.domain=dom; d.domainPending='';
+        toast(t('تم ربط الدومين ✓','Domain linked ✓'));
+        repaint();
+      }catch(e){
+        console.error(e);
+        msg(t('تعذّر إتمام الربط — تأكد من نشر قواعد قاعدة البيانات.','Could not complete the link — make sure the database rules are published.'));
+        verify.disabled=false; verify.textContent=old;
+      }
+    };
+
+    const cancel=$('#domCancel');
+    if(cancel) cancel.onclick=async()=>{
+      try{
+        await remove(ref(db,'blogs/'+id+'/domainPending')).catch(()=>{});
+        d.domainPending='';
+      }catch(e){}
+      repaint();
+    };
+
+    const unlink=$('#domUnlink');
+    if(unlink) unlink.onclick=async()=>{
+      if(!confirm(t('فصل الدومين عن هذه المدونة؟ سيتوقف عرضها على دومينك.','Disconnect the domain from this blog? It will stop being served on your domain.'))) return;
+      unlink.disabled=true;
+      try{
+        await unlinkDomain(d.domain, id);
+        d.domain=''; d.domainToken=''; d.domainPending='';
+        toast(t('تم فصل الدومين','Domain disconnected'));
+      }catch(e){ console.error(e); toast(t('تعذّر الفصل','Could not disconnect')); unlink.disabled=false; return; }
+      repaint();
+    };
   }
 
   async function showBlogAdmin(){
@@ -2502,6 +2694,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
         $('#baQR')&&($('#baQR').onclick=()=>openQR(urlBlogView(id), d.title||t('مدونتي','My Blog')));
         $('#baEdit')&&($('#baEdit').onclick=()=>startBlogEdit(id));
         $('#baNew')&&($('#baNew').onclick=()=>startBlogEdit(id,'new'));
+        wireDomainPanel(id,d,paint);
         document.querySelectorAll('[data-pedit]').forEach(b=>b.onclick=()=>startBlogEdit(id,+b.dataset.pedit));
         document.querySelectorAll('[data-ppub]').forEach(b=>b.onclick=async()=>{
           const i=+b.dataset.ppub; if(!d.posts[i]) return;
@@ -2530,7 +2723,9 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
 
   /* ---------- blog builder state ---------- */
   const BLOG_EMPTY = { title:'', subtitle:'', author:'', authorEn:'', about:'', cover:'', logo:'', design:'bd1', frame:'none',
-    threeD:false, anim:'none', searchStyle:'off', sidebarStyle:'none', tickerStyle:'none', posts:[] };
+    threeD:false, anim:'none', searchStyle:'off', sidebarStyle:'none', tickerStyle:'none', posts:[],
+    /* custom domain — carried through the builder so saving never unlinks it */
+    domain:'', domainToken:'', domainPending:'' };
   const BLOG_SAMPLE = {
     title:t('مدوّنة الفكر والمعرفة','The Thought & Knowledge Blog'), subtitle:t('مقالات في العلم والثقافة والتطوير الذاتي — تُنشر بعناية لتثري عقلك.','Articles on science, culture, and self-development — carefully written to enrich your mind.'),
     author:t('أ. محمد الجوهري','Mohamed Elgohary'), authorEn:'Mohamed Elgohary', about:t('مساحة معرفية أنشرها لمشاركة أفكاري وقراءاتي وتجاربي مع كل باحث عن المعرفة.','A knowledge space I publish to share my thoughts, readings, and experiences with every seeker of knowledge.'),
@@ -2572,7 +2767,8 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
       if(!s.exists()){ toast(t('المدونة غير موجودة','Blog not found')); showBlogAdmin(); return; }
       const d=s.val();
       blogState={...BLOG_EMPTY};
-      ['title','subtitle','author','authorEn','about','cover','logo','design','threeD','anim','searchStyle','sidebarStyle','tickerStyle'].forEach(k=>{ if(d[k]!=null) blogState[k]=d[k]; });
+      ['title','subtitle','author','authorEn','about','cover','logo','design','threeD','anim','searchStyle','sidebarStyle','tickerStyle',
+       'domain','domainToken','domainPending'].forEach(k=>{ if(d[k]!=null) blogState[k]=d[k]; });
       blogState.posts = Array.isArray(d.posts)?d.posts.filter(Boolean).map(p=>({...p})):[];
       if(!BLOG_BY_ID[blogState.design]) blogState.design='bd1';
       blogEditingId=id;
@@ -3065,11 +3261,15 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
           : `<div class="xp-empty">${list.length?t('لا توجد نتائج مطابقة لبحثك.','No results match your search.'):t('لا توجد مدونات منشورة بعد — كن أول من ينشر مدونته!','No blogs published yet — be the first to publish yours!')}</div>`;
       };
       draw(list);
+      /* An explore page with no blogs is an empty page: no index entry, no ad. */
+      setRobots(list.length > 0);
+      if(!list.length) noAdsHere();
       if(window.elgFillAds) window.elgFillAds($('#app'));
       const sb=$('#xpSearch'); if(sb) sb.oninput=()=>{ const q=sb.value.trim().toLowerCase();
         draw(!q?list:list.filter(b=>((b.title||'')+' '+(b.author||'')+' '+(b.subtitle||'')).toLowerCase().includes(q))); };
     }catch(e){
       console.error(e);
+      setRobots(false); noAdsHere();
       $('#xpList').innerHTML=`<div class="xp-empty">${t('تعذّر تحميل المدونات. تحقّق من اتصالك أو من قواعد قاعدة البيانات.','Failed to load blogs. Check your connection or the database rules.')}</div>`;
     }
   }
@@ -3440,6 +3640,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
      admin panel's existence is fully hidden: a white page with only "404" on it. */
   function showAdmin404(){
     try{ document.title='404'; }catch(e){}
+    setRobots(false); noAdsHere();
     const html='<div style="position:fixed;inset:0;margin:0;display:flex;align-items:center;justify-content:center;background:#fff;color:#111;font-family:system-ui,-apple-system,\'Segoe UI\',Arial,sans-serif;font-weight:700;font-size:clamp(64px,18vw,150px);letter-spacing:2px">404</div>';
     try{ document.body.style.cssText='margin:0;background:#fff'; document.body.innerHTML=html; }
     catch(e){ document.documentElement.innerHTML='<body style="margin:0;background:#fff">'+html+'</body>'; }
@@ -4205,11 +4406,12 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
   }
   function showMaintenancePage(){
     document.title=t('صيانة — elgoharyX','Maintenance — elgoharyX');
+    setRobots(false); noAdsHere();   // no content here to index or monetise
     try{ document.body.style.background=''; }catch(e){}
     const msg=(maintCfg && maintCfg.msg) ? maintCfg.msg : t('نُجري بعض التحسينات على الموقع الآن. من فضلك عُد بعد قليل — نعتذر عن الإزعاج.','We are making some improvements right now. Please check back shortly — sorry for the inconvenience.');
     const app=document.getElementById('app'); if(!app) return;
     app.innerHTML=`<div class="err-wrap"><div class="err-card">
-      <img class="err-logo" src="${LOGO}" alt="elgoharyX"/>
+      <span class="err-logo">${tile({size:52,radius:17})}</span>
       <div class="err-code">🛠️</div>
       <span class="err-tag"><i></i>${t('صيانة · MAINTENANCE','Maintenance · MAINTENANCE')}</span>
       <h2 class="err-title">${t('الموقع تحت الصيانة','Under maintenance')}</h2>
@@ -4239,11 +4441,33 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
     document.body.appendChild(b);
   }
   /* route() wrapped with the maintenance gate — used by init() on every page load */
+  /* ---------- custom-domain router ----------
+     When the app is served from a hostname that is not ours, that hostname was
+     pointed here by a blog owner. Resolve it to their blog and render it at the
+     root, so https://their-domain.com IS the blog. See assets/domains.js. */
+  let _customBlogId = null;
+  async function routeCustomHost(){
+    if(!isCustomHost()) return false;
+    const p = new URLSearchParams(location.search);
+    // an explicit ?blog=/?id= on the custom host still wins, so shared links work
+    if(p.get('blog') || p.get('id')) return false;
+    const id = await resolveHostToBlog(location.hostname);
+    if(!id){
+      renderError({code:'404', tag:t('دومين غير مربوط · DOMAIN NOT LINKED','DOMAIN NOT LINKED'),
+        title:t('هذا الدومين غير مربوط بمدونة','This domain is not linked to a blog'),
+        msg:t('وصلت إلى elgoharyX عبر دومين لم يُربط بأي مدونة بعد، أو أُلغي ربطه. إن كنت مالك الدومين فأكمل الربط من صفحة إدارة مدونتك.','You reached elgoharyX through a domain that is not linked to any blog yet, or whose link was removed. If you own the domain, finish linking it from your blog management page.')});
+      return true;
+    }
+    _customBlogId = id;
+    showBlogViewer(id);
+    return true;
+  }
   async function routeGuarded(){
     if(maintCfg===null) await loadMaintenance();
     const anyMaint = maintActiveList().length>0;
     if(anyMaint && adminEmail===undefined) await loadAdminEmail();   // load so the admin can bypass + see the banner
     if(maintOn() && !isAdmin()){ showMaintenancePage(); return; }
+    if(await routeCustomHost()){ showAdminMaintBanner(); return; }
     route();
     showAdminMaintBanner();
   }
@@ -5060,7 +5284,7 @@ import { logVisit, startPresence, captureReferral, recordReferralIfPending, refe
     window.elgStore = function(){ try{ openStore(); }catch(e){} };
 
     /* ---------- device (OS) notifications for rewards & reminders ---------- */
-    var ELG_LOGO='https://i.ibb.co/1t1TCvH7/103777.png';
+    var ELG_LOGO=(location.origin+location.pathname.replace(/[^/]*$/,''))+'assets/brand/icon-192.png';
     function notifCap(){ return ('Notification' in window); }
     function notifyOS(title, body){
       try{

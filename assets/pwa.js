@@ -6,7 +6,8 @@
 (function () {
   'use strict';
 
-  var LOGO = 'https://i.ibb.co/1t1TCvH7/103777.png';
+  // repo-local brand icon (see assets/brand/) — no third-party image host
+  var LOGO = location.pathname.replace(/[^/]*$/, '') + 'assets/brand/icon-192.png';
   var DISMISS_KEY = 'apb_pwa_dismissed';
 
   // pick the active language (saved choice, else device language) for banner text

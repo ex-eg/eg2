@@ -1,0 +1,372 @@
+/* =========================================================================
+   elgoharyX — BRAND SYSTEM  ·  هوية بصرية
+   -------------------------------------------------------------------------
+   Loaded BEFORE styles.css. This file holds only identity primitives —
+   colour scales, type scale, spacing, radii, elevation, motion — plus the
+   presentation of the logo lockups produced by assets/brand.js.
+   Nothing here is page-specific; styles.css consumes these tokens.
+
+   CONCEPT · «الجوهرة» — the jeweller's stone. Deep ink ground, one warm gold
+   accent used sparingly as light on a facet, sapphire as the interactive
+   colour. Serif display + Arabic humanist text + a technical face for data.
+   ========================================================================= */
+
+:root {
+  /* ---- ink (surfaces) ------------------------------------------------- */
+  --ink-50:#F0F4FC;  --ink-100:#D6DFF1; --ink-200:#AEBBD8; --ink-300:#8492B4;
+  --ink-400:#5B6A8F; --ink-500:#3B4868; --ink-600:#26314C; --ink-700:#16203A;
+  --ink-800:#0F1B31; --ink-900:#0A1120; --ink-950:#060B16;
+
+  /* ---- aurum (primary brand accent) ---------------------------------- */
+  --gold-50:#FBF6E9;  --gold-100:#F6ECCF; --gold-200:#EEDCA6; --gold-300:#E5C97C;
+  --gold-400:#DBB861; --gold-500:#D0AA4E; --gold-600:#B08F3C; --gold-700:#8A6E2B;
+  --gold-800:#614D1D; --gold-900:#3B2F11;
+
+  /* ---- sapphire (interaction) ---------------------------------------- */
+  --sapph-200:#B9CCF5; --sapph-300:#7AA0EA; --sapph-400:#4C86E0;
+  --sapph-500:#3663C4; --sapph-600:#2A4E9C; --sapph-700:#1E3A76;
+
+  /* ---- signal -------------------------------------------------------- */
+  --ok:#3FBF87; --ok-soft:rgba(63,191,135,.14);
+  --warn:#E6B455; --warn-soft:rgba(230,180,85,.14);
+  --bad:#E0687A; --bad-soft:rgba(224,104,122,.14);
+  --info:#4C86E0; --info-soft:rgba(76,134,224,.14);
+
+  /* ---- typography ---------------------------------------------------- */
+  --font-display:"Cormorant Garamond","Amiri",Georgia,serif;
+  --font-display-ar:"Amiri","Cormorant Garamond",serif;
+  --font-text:"IBM Plex Sans Arabic",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-tech:"Space Grotesk",ui-monospace,"Cascadia Mono",monospace;
+
+  /* fluid type scale — 8 steps, min→max clamped on viewport width */
+  --fs-50:clamp(11px,.68rem + .1vw,12px);      /* micro label */
+  --fs-100:clamp(12.5px,.76rem + .12vw,13.5px);/* caption */
+  --fs-200:clamp(14px,.85rem + .15vw,15px);    /* body small */
+  --fs-300:clamp(15px,.9rem + .2vw,16.5px);    /* body */
+  --fs-400:clamp(17px,1rem + .35vw,19px);      /* lead */
+  --fs-500:clamp(20px,1.1rem + .8vw,24px);     /* h4 */
+  --fs-600:clamp(23px,1.2rem + 1.4vw,30px);    /* h3 */
+  --fs-700:clamp(27px,1.3rem + 2.4vw,40px);    /* h2 */
+  --fs-800:clamp(33px,1.4rem + 4.4vw,64px);    /* h1 */
+  --fs-900:clamp(40px,1.5rem + 6.4vw,86px);    /* display */
+
+  --lh-tight:1.08; --lh-snug:1.3; --lh-normal:1.65; --lh-loose:1.95;
+  --ls-display:-.02em; --ls-label:.16em;
+
+  /* ---- space (4px base, geometric) ----------------------------------- */
+  --sp-1:4px;  --sp-2:8px;  --sp-3:12px; --sp-4:16px; --sp-5:24px;
+  --sp-6:32px; --sp-7:48px; --sp-8:64px; --sp-9:96px; --sp-10:128px;
+  --gutter:clamp(16px,5vw,40px);
+  --measure:66ch;
+  --maxw:1240px;
+  --maxw-prose:820px;
+
+  /* ---- radii --------------------------------------------------------- */
+  --r-xs:6px; --r-sm:9px; --r-md:14px; --r-lg:18px; --r-xl:24px; --r-2xl:32px; --r-pill:999px;
+
+  /* ---- elevation ----------------------------------------------------- */
+  --sh-1:0 1px 2px rgba(2,7,18,.35);
+  --sh-2:0 6px 22px -12px rgba(2,7,18,.6);
+  --sh-3:0 18px 44px -20px rgba(2,7,18,.72);
+  --sh-4:0 30px 70px -28px rgba(2,7,18,.8);
+  --sh-gold:0 16px 40px -16px rgba(208,170,78,.45);
+
+  /* ---- gradients ----------------------------------------------------- */
+  --grad-aurum:linear-gradient(120deg,var(--gold-100),var(--gold-500));
+  --grad-sapph:linear-gradient(120deg,var(--sapph-500),var(--sapph-300));
+  --grad-signature:linear-gradient(120deg,var(--sapph-400) 0%,var(--sapph-300) 42%,var(--gold-200) 100%);
+  --grad-ink:linear-gradient(180deg,var(--ink-800),var(--ink-950));
+  --hairline:linear-gradient(90deg,transparent,var(--gold-500),var(--gold-200),var(--gold-500),transparent);
+
+  /* ---- motion -------------------------------------------------------- */
+  --ease-out:cubic-bezier(.2,.75,.2,1);
+  --ease-in-out:cubic-bezier(.65,.05,.36,1);
+  --ease-spring:cubic-bezier(.22,1.4,.36,1);
+  --dur-1:120ms; --dur-2:200ms; --dur-3:320ms; --dur-4:520ms; --dur-5:820ms;
+
+  /* ---- layering ------------------------------------------------------ */
+  --z-base:0; --z-raised:10; --z-appbar:20; --z-drawer:40; --z-overlay:60;
+  --z-toast:80; --z-consent:90; --z-max:99;
+
+  /* ---- focus --------------------------------------------------------- */
+  --focus-ring:0 0 0 3px color-mix(in srgb,var(--sapph-400) 42%,transparent);
+  --focus-ring-gold:0 0 0 3px color-mix(in srgb,var(--gold-500) 40%,transparent);
+}
+
+/* light mode remaps the surface end of the ink scale; the accents hold. */
+:root[data-mode="light"] {
+  --sh-1:0 1px 2px rgba(16,27,49,.08);
+  --sh-2:0 6px 22px -12px rgba(16,27,49,.18);
+  --sh-3:0 18px 44px -20px rgba(16,27,49,.22);
+  --sh-4:0 30px 70px -28px rgba(16,27,49,.26);
+  --grad-ink:linear-gradient(180deg,#FFFFFF,var(--ink-50));
+}
+
+/* ---------- accessibility & motion preferences ---------- */
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-1:0ms; --dur-2:0ms; --dur-3:0ms; --dur-4:0ms; --dur-5:0ms; }
+  *,*::before,*::after { animation-duration:.001ms !important; animation-iteration-count:1 !important;
+    transition-duration:.001ms !important; scroll-behavior:auto !important; }
+}
+:where(a,button,input,select,textarea,summary,[tabindex]):focus-visible {
+  outline:none; box-shadow:var(--focus-ring); border-radius:var(--r-xs);
+}
+
+/* =========================================================================
+   LOGO LOCKUPS — presentation for the markup produced by brand.js
+   The logo itself is a raster (the original EX monogram); these rules only
+   size it, round it and keep the lockups aligned.
+   ========================================================================= */
+.elg-lockup { display:inline-flex; align-items:center; gap:var(--sp-3); line-height:1; }
+.elg-lockup-link { display:inline-block; text-decoration:none; }
+.elg-lockup-link:hover .elg-tile { transform:translateY(-1px); }
+.elg-mark, .elg-tile { display:block; object-fit:contain; }
+.elg-tile { background:#fff; box-shadow:var(--sh-2);
+  transition:transform var(--dur-3) var(--ease-spring); }
+.elg-lk-txt { display:flex; flex-direction:column; gap:4px; }
+.elg-wordmark { font-family:var(--font-tech); font-weight:600; letter-spacing:-.03em;
+  color:var(--ink-50); line-height:1; }
+.elg-wordmark b { font-weight:700; color:var(--gold-300); }
+.elg-lk-tag { font-family:var(--font-text); font-size:var(--fs-50); color:var(--ink-300);
+  letter-spacing:.01em; white-space:nowrap; }
+.elg-lk-name { font-family:var(--font-tech); font-weight:600; font-size:var(--fs-300);
+  letter-spacing:-.02em; color:var(--ink-50); }
+.elg-lk-stack { flex-direction:column; text-align:center; gap:var(--sp-3); }
+.elg-lk-stack .elg-lk-txt { align-items:center; }
+:root[data-mode="light"] .elg-wordmark { color:var(--ink-800); }
+:root[data-mode="light"] .elg-wordmark b { color:var(--gold-600); }
+:root[data-mode="light"] .elg-lk-name { color:var(--ink-800); }
+
+/* the mark inside a ring — certificates, empty states */
+.elg-seal { display:grid; place-items:center; border-radius:50%;
+  border:1px solid color-mix(in srgb,var(--gold-500) 45%,transparent);
+  box-shadow:inset 0 0 0 6px color-mix(in srgb,var(--gold-500) 8%,transparent);
+  background:#fff; }
+
+/* a hairline divider that ends in the brand accent */
+.elg-rule { display:flex; align-items:center; gap:var(--sp-3); color:var(--gold-300); }
+.elg-rule::before, .elg-rule::after { content:""; flex:1; height:1px; background:var(--hairline); }
+
+/* =========================================================================
+   BRAND UTILITIES — small, composable, safe to use anywhere
+   ========================================================================= */
+.u-display   { font-family:var(--font-display); font-weight:700; letter-spacing:var(--ls-display); line-height:var(--lh-tight); }
+.u-eyebrow   { font-family:var(--font-tech); font-size:var(--fs-50); text-transform:uppercase;
+               letter-spacing:var(--ls-label); color:var(--gold-300); }
+.u-tech      { font-family:var(--font-tech); font-variant-numeric:tabular-nums; }
+.u-prose     { max-width:var(--measure); line-height:var(--lh-loose); color:var(--ink-200); }
+.u-gold-text { background:var(--grad-aurum); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.u-hairline  { height:1px; background:var(--hairline); border:0; }
+
+/* a chip that reads as light caught on a facet */
+.u-chip { display:inline-flex; align-items:center; gap:var(--sp-2); padding:6px 14px;
+  border-radius:var(--r-pill); font-size:var(--fs-100);
+  border:1px solid color-mix(in srgb,var(--gold-500) 30%,transparent);
+  background:color-mix(in srgb,var(--gold-500) 9%,transparent); color:var(--gold-200); }
+
+/* =========================================================================
+   EDITORIAL PAGES — shared layout for the static content/policy documents
+   ========================================================================= */
+.doc-shell { max-width:var(--maxw-prose); margin:0 auto; padding:var(--sp-7) var(--gutter) var(--sp-9); }
+.doc-head { text-align:center; margin-bottom:var(--sp-7); }
+.doc-head .elg-lockup { margin-bottom:var(--sp-5); }
+.doc-head h1 { font-family:var(--font-display); font-size:var(--fs-700); line-height:var(--lh-tight);
+  margin-bottom:var(--sp-3); }
+.doc-head .doc-sub { color:var(--ink-300); font-size:var(--fs-200); }
+.doc-toc { border:1px solid color-mix(in srgb,var(--ink-50) 12%,transparent); border-radius:var(--r-lg);
+  padding:var(--sp-5); margin-bottom:var(--sp-7); background:color-mix(in srgb,var(--ink-50) 3%,transparent); }
+.doc-toc b { display:block; font-family:var(--font-tech); font-size:var(--fs-50);
+  text-transform:uppercase; letter-spacing:var(--ls-label); color:var(--gold-300); margin-bottom:var(--sp-3); }
+.doc-toc ol { margin:0; padding-inline-start:1.2em; display:grid; gap:6px; }
+.doc-toc a { color:var(--ink-200); font-size:var(--fs-200); text-decoration:none; }
+.doc-toc a:hover { color:var(--gold-200); text-decoration:underline; }
+.doc-sec { margin-bottom:var(--sp-7); scroll-margin-top:80px; }
+.doc-sec h2 { font-family:var(--font-display); font-size:var(--fs-600); margin-bottom:var(--sp-4);
+  display:flex; align-items:baseline; gap:var(--sp-3); }
+.doc-sec h2 .n { font-family:var(--font-tech); font-size:var(--fs-100); color:var(--gold-400);
+  flex:none; opacity:.9; }
+.doc-sec h3 { font-size:var(--fs-400); margin:var(--sp-5) 0 var(--sp-2); color:var(--ink-50); }
+.doc-sec p, .doc-sec li { color:var(--ink-200); font-size:var(--fs-200); line-height:var(--lh-loose); }
+.doc-sec p { margin-bottom:var(--sp-3); }
+.doc-sec ul, .doc-sec ol { margin:0 0 var(--sp-4); padding-inline-start:1.35em; display:grid; gap:var(--sp-2); }
+.doc-sec a { color:var(--gold-200); }
+.doc-note { border-inline-start:3px solid var(--gold-500); border-radius:var(--r-sm);
+  padding:var(--sp-4) var(--sp-5); background:color-mix(in srgb,var(--gold-500) 8%,transparent);
+  margin:var(--sp-4) 0; }
+.doc-note p:last-child { margin-bottom:0; }
+.doc-table { width:100%; border-collapse:collapse; font-size:var(--fs-100); margin:var(--sp-4) 0; }
+.doc-table th, .doc-table td { text-align:start; padding:10px 12px; vertical-align:top;
+  border-bottom:1px solid color-mix(in srgb,var(--ink-50) 10%,transparent); }
+.doc-table th { font-family:var(--font-tech); font-size:var(--fs-50); text-transform:uppercase;
+  letter-spacing:.08em; color:var(--gold-300); }
+.doc-table td { color:var(--ink-200); line-height:var(--lh-normal); }
+.doc-scroll { overflow-x:auto; }
+.doc-updated { font-family:var(--font-tech); font-size:var(--fs-50); color:var(--ink-400);
+  text-align:center; margin-top:var(--sp-7); }
+.doc-nav { display:flex; flex-wrap:wrap; gap:var(--sp-2); justify-content:center; margin-top:var(--sp-5); }
+.doc-nav a { font-size:var(--fs-100); color:var(--ink-300); text-decoration:none; padding:6px 12px;
+  border:1px solid color-mix(in srgb,var(--ink-50) 12%,transparent); border-radius:var(--r-pill); }
+.doc-nav a:hover { color:var(--gold-200); border-color:color-mix(in srgb,var(--gold-500) 40%,transparent); }
+
+/* =========================================================================
+   APP-SHELL LOGO SLOTS — .brand .mark / .db-mark used to be tinted plates with
+   a glyph on top. The logo file already carries its own light plate, so those
+   containers stop painting a background and just hold it.
+   ========================================================================= */
+.brand .mark, .drawer-brand .db-mark { background:none !important; border:0 !important;
+  box-shadow:none !important; overflow:visible; }
+.brand .mark .elg-tile { width:34px; height:34px; }
+.drawer-brand .db-mark .elg-tile { width:40px; height:40px; }
+.drawer-foot .elg-tile, .dr-foot-mark .elg-tile { width:20px; height:20px; }
+.site-foot img { border-radius:6px; }
+.pro-loader .pl-logo { border-radius:8px; }
+span.err-logo { display:grid; place-items:center; margin:0 auto var(--sp-4); line-height:0; }
+
+/* =========================================================================
+   AD FRAMES — layout only. Whether an ad may exist at all is decided in
+   assets/ads.js; this file just makes a *live* unit sit correctly and makes a
+   dead one take zero space, so the page never shows an empty labelled box.
+   ========================================================================= */
+.elg-ad { max-width:900px; margin:var(--sp-6) auto; padding:0 var(--sp-4);
+  text-align:center; clear:both; }
+.elg-ad:not([data-done]) { display:none; }
+.elg-ad .elg-ad-lbl { display:block; font-family:var(--font-tech); font-size:var(--fs-50);
+  letter-spacing:var(--ls-label); text-transform:uppercase; color:var(--ink-400);
+  margin-bottom:var(--sp-2); }
+.elg-ad ins { display:block; min-height:0; }
+.elg-ad ins[data-ad-status="unfilled"] { display:none !important; }
+.elg-ad:has(ins[data-ad-status="unfilled"]) { display:none; }
+
+/* =========================================================================
+   CONSENT BANNER (assets/consent.js) — Accept and Reject are deliberately the
+   same size and weight; Google rejects banners that nudge toward Accept.
+   ========================================================================= */
+#elgConsent { position:fixed; inset-inline:0; bottom:0; z-index:var(--z-consent);
+  padding:var(--sp-3) var(--gutter) calc(var(--sp-3) + env(safe-area-inset-bottom,0px));
+  background:color-mix(in srgb,var(--ink-950) 88%,transparent);
+  border-top:1px solid color-mix(in srgb,var(--gold-500) 26%,transparent);
+  backdrop-filter:blur(14px); box-shadow:var(--sh-4);
+  transform:translateY(110%); transition:transform var(--dur-4) var(--ease-out); }
+#elgConsent.in { transform:none; }
+#elgConsent .elgc-in { max-width:var(--maxw); margin:0 auto; display:flex;
+  align-items:center; gap:var(--sp-5); flex-wrap:wrap; }
+#elgConsent .elgc-txt { flex:1 1 340px; min-width:0; }
+#elgConsent .elgc-txt b { display:block; font-family:var(--font-display);
+  font-size:var(--fs-300); color:var(--ink-50); margin-bottom:3px; }
+#elgConsent .elgc-txt p { font-family:var(--font-text); font-size:var(--fs-100);
+  line-height:var(--lh-normal); color:var(--ink-300); margin:0; }
+#elgConsent .elgc-txt a { color:var(--gold-200); }
+#elgConsent .elgc-btns { display:flex; gap:var(--sp-2); flex:0 0 auto; }
+#elgConsent .elgc-btn { font-family:var(--font-text); font-size:var(--fs-100); font-weight:600;
+  padding:11px 26px; border-radius:var(--r-pill); cursor:pointer; min-width:112px;
+  border:1px solid color-mix(in srgb,var(--ink-50) 22%,transparent);
+  background:transparent; color:var(--ink-100);
+  transition:transform var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out); }
+#elgConsent .elgc-btn:hover { transform:translateY(-1px); }
+#elgConsent .elgc-no:hover { border-color:var(--ink-300); }
+#elgConsent .elgc-yes { background:var(--grad-aurum); border-color:transparent;
+  color:var(--ink-950); box-shadow:var(--sh-gold); }
+@media (max-width:560px) {
+  #elgConsent .elgc-btns { width:100%; }
+  #elgConsent .elgc-btn { flex:1; min-width:0; }
+}
+:root[data-mode="light"] #elgConsent {
+  background:color-mix(in srgb,#ffffff 92%,transparent);
+}
+:root[data-mode="light"] #elgConsent .elgc-txt b { color:var(--ink-800); }
+:root[data-mode="light"] #elgConsent .elgc-txt p { color:var(--ink-500); }
+:root[data-mode="light"] #elgConsent .elgc-btn { color:var(--ink-700);
+  border-color:color-mix(in srgb,var(--ink-900) 18%,transparent); }
+
+/* =========================================================================
+   CUSTOM DOMAIN PANEL (blog admin) — see assets/domains.js
+   ========================================================================= */
+.dom-card { max-width:var(--maxw); margin:var(--sp-5) auto 0;
+  border:1px solid color-mix(in srgb,var(--gold-500) 24%,transparent);
+  border-radius:var(--r-lg); padding:var(--sp-5);
+  background:radial-gradient(620px 220px at 88% -40%,color-mix(in srgb,var(--gold-500) 12%,transparent),transparent 62%),
+             var(--grad-ink);
+  box-shadow:var(--sh-2); }
+.dom-head { display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  margin-bottom:var(--sp-4); }
+.dom-ic { width:40px; height:40px; flex:none; border-radius:var(--r-sm); display:grid;
+  place-items:center; color:var(--gold-200);
+  background:color-mix(in srgb,var(--gold-500) 14%,transparent);
+  border:1px solid color-mix(in srgb,var(--gold-500) 26%,transparent); }
+.dom-ic svg { width:21px; height:21px; }
+.dom-tt { flex:1 1 220px; min-width:0; }
+.dom-tt h3 { font-family:var(--font-display); font-size:var(--fs-500); margin:0 0 2px; }
+.dom-tt .sub { font-size:var(--fs-100); color:var(--ink-300); }
+.dom-badge { flex:none; font-family:var(--font-tech); font-size:var(--fs-50);
+  text-transform:uppercase; letter-spacing:.1em; padding:6px 13px; border-radius:var(--r-pill);
+  border:1px solid currentColor; }
+.dom-badge.ok   { color:var(--ok);   background:var(--ok-soft); }
+.dom-badge.wait { color:var(--warn); background:var(--warn-soft); }
+.dom-badge.off  { color:var(--ink-300); background:color-mix(in srgb,var(--ink-50) 5%,transparent); }
+.dom-help { font-size:var(--fs-100); color:var(--ink-300); line-height:var(--lh-normal);
+  margin:var(--sp-2) 0 0; }
+.dom-help a { color:var(--gold-200); }
+.dom-row { display:flex; gap:var(--sp-2); flex-wrap:wrap; margin-top:var(--sp-3); }
+.dom-row input { flex:1 1 240px; min-width:0; font-family:var(--font-tech); }
+.dom-row .btn { flex:0 0 auto; width:auto; padding:12px 22px; }
+.dom-rec { display:flex; align-items:center; gap:var(--sp-3); flex-wrap:wrap;
+  padding:11px var(--sp-3); border-radius:var(--r-sm); margin-top:var(--sp-2);
+  background:color-mix(in srgb,var(--ink-950) 55%,transparent);
+  border:1px solid color-mix(in srgb,var(--ink-50) 9%,transparent); }
+.dom-rec-k { flex:0 0 108px; font-size:var(--fs-50); font-family:var(--font-tech);
+  text-transform:uppercase; letter-spacing:.09em; color:var(--gold-300); }
+.dom-rec-v { flex:1 1 200px; min-width:0; font-family:var(--font-tech); font-size:var(--fs-100);
+  color:var(--ink-50); overflow-wrap:anywhere; }
+.dom-copy { flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  font-family:var(--font-text); font-size:var(--fs-50); padding:7px 13px;
+  border-radius:var(--r-pill); color:var(--ink-200); background:transparent;
+  border:1px solid color-mix(in srgb,var(--ink-50) 16%,transparent); }
+.dom-copy:hover { color:var(--gold-200); border-color:color-mix(in srgb,var(--gold-500) 42%,transparent); }
+.dom-copy svg { width:13px; height:13px; }
+.dom-msg { font-size:var(--fs-100); line-height:var(--lh-normal); color:var(--bad);
+  margin-top:var(--sp-3); min-height:1px; }
+.dom-msg.ok { color:var(--ok); }
+.dom-acts { display:flex; gap:var(--sp-2); flex-wrap:wrap; margin-top:var(--sp-4); }
+.dom-acts .btn { width:auto; padding:11px 20px; }
+.dom-live-url { display:inline-block; font-family:var(--font-tech); font-size:var(--fs-400);
+  color:var(--gold-200); word-break:break-all; }
+
+/* =========================================================================
+   CODE BLOCKS — the DNS / config snippets on custom-domain.html
+   ========================================================================= */
+.doc-code { margin:var(--sp-4) 0; border-radius:var(--r-md); overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--ink-50) 12%,transparent);
+  background:color-mix(in srgb,var(--ink-950) 60%,transparent); }
+.doc-code figcaption { display:flex; align-items:center; justify-content:space-between;
+  gap:var(--sp-3); padding:9px var(--sp-4); font-family:var(--font-tech);
+  font-size:var(--fs-50); text-transform:uppercase; letter-spacing:.09em;
+  color:var(--gold-300);
+  border-bottom:1px solid color-mix(in srgb,var(--ink-50) 10%,transparent);
+  background:color-mix(in srgb,var(--ink-50) 4%,transparent); }
+.doc-code-copy { flex:none; cursor:pointer; font-family:var(--font-text); font-size:var(--fs-50);
+  padding:5px 13px; border-radius:var(--r-pill); color:var(--ink-200); background:transparent;
+  border:1px solid color-mix(in srgb,var(--ink-50) 18%,transparent); text-transform:none;
+  letter-spacing:0; }
+.doc-code-copy:hover { color:var(--gold-200);
+  border-color:color-mix(in srgb,var(--gold-500) 42%,transparent); }
+.doc-code pre { margin:0; padding:var(--sp-4); overflow-x:auto; }
+.doc-code code { font-family:var(--font-tech); font-size:var(--fs-100);
+  line-height:1.75; color:var(--ink-100); white-space:pre; }
+.doc-sec code, .doc-table code { font-family:var(--font-tech); font-size:.92em;
+  padding:2px 6px; border-radius:var(--r-xs); color:var(--gold-200);
+  background:color-mix(in srgb,var(--gold-500) 10%,transparent); overflow-wrap:anywhere; }
+
+/* =========================================================================
+   FOOTER LINK NAV — every page reaches every policy document in one click.
+   An ad network expects a site to be navigable; a footer with only a
+   copyright line is one of the things a reviewer marks against you.
+   ========================================================================= */
+.site-foot { flex-wrap:wrap; }
+.foot-links { flex:1 0 100%; display:flex; flex-wrap:wrap; align-items:center;
+  justify-content:center; gap:var(--sp-2) 0; margin-top:6px;
+  font-size:var(--fs-50); color:var(--ink-400); line-height:1.9; }
+.foot-links a { color:var(--ink-300); text-decoration:none; padding:0 9px;
+  border-inline-end:1px solid color-mix(in srgb,var(--ink-50) 12%,transparent); }
+.foot-links a:last-child { border-inline-end:0; }
+.foot-links a:hover { color:var(--gold-200); text-decoration:underline; }
+:root[data-mode="light"] .foot-links a { color:var(--ink-500); }

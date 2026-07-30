@@ -3,6 +3,9 @@
    screen and id/short-link utilities. Every other module imports what it needs
    from here. Kept dependency-light: only Firebase (for the unique-id lookups). */
 import { db, ref, get, child } from './firebase.js';
+/* the visual identity — importing it installs the favicon and the lockups */
+import { mark, tile, lockup, seal, BRAND, upgradeLegacyLogos } from './brand.js';
+export { mark, tile, lockup, seal, BRAND, upgradeLegacyLogos };
 
 /* ---------- multi-page site links ----------
    Every section lives in its own HTML file in the same folder. ROOT is that
@@ -38,7 +41,16 @@ export const urlBlogEdit    = id  => pageUrl('create-blog.html', 'blogedit=' + e
 export const gotoLogin = () => { location.href = urlLogin() + '?next=' + encodeURIComponent(location.href); };
 
 /* ---------- helpers ---------- */
-export const LOGO='https://i.ibb.co/1t1TCvH7/103777.png';
+/* Brand imagery. These are real files in the repo, not a third-party image
+   host, so a link rot at imgbb can no longer break the identity or the social
+   cards. LOGO is the square icon (schema.org / notifications), OG_IMAGE is the
+   1200×630 social card. */
+export const LOGO     = ROOT + 'assets/brand/icon-512.png';
+export const OG_IMAGE = ROOT + 'assets/brand/og.png';
+/* ready-made inline lockups for the app shell */
+export const MARK   = mark({ size: 20 });
+export const MARK_L = mark({ size: 26 });
+export const TILE   = tile({ size: 22, radius: 7 });
 export const SUN='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>';
 export const MOON='<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>';
 /* iOS-style line icons (replace emoji) */
@@ -78,10 +90,32 @@ export function setMeta(sel, attr, val){
   if(!el){ el=document.createElement('meta'); const m=sel.match(/\[(name|property)="([^"]+)"\]/); if(m) el.setAttribute(m[1],m[2]); document.head.appendChild(el); }
   el.setAttribute(attr, val);
 }
+/* Point <link rel="canonical"> at the URL this view really lives at.
+   Every blog used to inherit `canonical → blog.html`, which told Google that
+   thousands of different blogs were one duplicated page — a direct cause of the
+   "low value / duplicate content" verdict from the AdSense review. */
+export function setCanonical(url){
+  let el=document.head.querySelector('link[rel="canonical"]');
+  if(!el){ el=document.createElement('link'); el.rel='canonical'; document.head.appendChild(el); }
+  el.href=url;
+  setMeta('meta[property="og:url"]','content',url);
+}
+/**
+ * Rewrite the robots directive for the current view.
+ * @param {boolean} index  false → noindex,nofollow (thin, private or gated views)
+ */
+export function setRobots(index){
+  setMeta('meta[name="robots"]','content',
+    index ? 'index, follow, max-image-preview:large' : 'noindex, nofollow');
+}
+/* Screens that must never carry an advertisement (errors, gates, empty states).
+   assets/ads.js exposes elgBlockAds; it is absent on pages that load no ads. */
+export function noAdsHere(){ try{ if(window.elgBlockAds) window.elgBlockAds(); }catch(e){} }
+
 export function seoFor(d){
   const title=(d.name||t('بروفايل','Profile'))+' — '+(d.role?d.role.slice(0,60):t('ملف أكاديمي','Academic profile'))+' | elgoharyX';
   const desc=(d.about||d.role||t('الملف الأكاديمي الشخصي','Personal academic profile')).slice(0,155);
-  const img=d.photo||LOGO;
+  const img=d.photo||OG_IMAGE;
   document.title=title;
   setMeta('meta[name="description"]','content',desc);
   setMeta('meta[property="og:title"]','content',title);
@@ -97,10 +131,12 @@ export function renderError(o){
   o=o||{};
   try{ document.body.style.background=''; }catch(e){}
   document.title=(o.code||t('خطأ','Error'))+' — elgoharyX';
+  setRobots(false);   // an error page must never be indexed…
+  noAdsHere();        // …nor carry an ad (AdSense policy)
   const app=document.getElementById('app'); if(!app) return;
   app.innerHTML=`
     <div class="err-wrap"><div class="err-card">
-      <img class="err-logo" src="${LOGO}" alt="elgoharyX"/>
+      <span class="err-logo">${tile({size:52,radius:17})}</span>
       <div class="err-code">${esc(o.code||'404')}</div>
       <span class="err-tag"><i></i>${esc(o.tag||t('رابط غير صالح · BROKEN LINK','Broken link · BROKEN LINK'))}</span>
       <h2 class="err-title">${esc(o.title||t('الصفحة غير موجودة','Page not found'))}</h2>
