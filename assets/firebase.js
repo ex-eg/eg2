@@ -30,7 +30,11 @@ export { GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithEmai
 
 const firebaseConfig = {
   apiKey: "AIzaSyDynVoQRSD9icEcXfEz8Fdjms-sNd9gz9Y",
-  authDomain: "xogame-a4254.firebaseapp.com",
+  authDomain: ((host) => {
+    const h = String(host || '').toLowerCase();
+    if (!h || h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '0.0.0.0') return 'localhost';
+    return 'xogame-a4254.firebaseapp.com';
+  })(location.hostname),
   databaseURL: "https://xogame-a4254-default-rtdb.firebaseio.com",
   projectId: "xogame-a4254",
   storageBucket: "xogame-a4254.firebasestorage.app",
@@ -60,14 +64,16 @@ export function captchaKeys(){
    with 401. Tying it to the deployed code key makes it deterministic: the key you
    register in App Check === the key in this file. To rotate, change the const above
    and re-register the matching key/secret in the Firebase App Check console. */
+const IS_LOCALHOST = ['localhost','127.0.0.1','::1','0.0.0.0'].includes(String(location.hostname || '').toLowerCase());
 try {
-  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+  if (IS_LOCALHOST) {
     self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  } else {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(DEFAULT_CAPTCHA_KEYS[0]),
+      isTokenAutoRefreshEnabled: true
+    });
   }
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(DEFAULT_CAPTCHA_KEYS[0]),
-    isTokenAutoRefreshEnabled: true
-  });
 } catch (e) { console.warn('App Check init skipped:', e); }
 
 /* ---------- database URL list (primary + admin-added backups) ----------

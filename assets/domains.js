@@ -137,11 +137,21 @@ export async function verifyDomainOwnership(domain, token) {
   const want = txtRecordValue(token);
   const found = await lookupTxt(name);
   if (found === null) return { ok: false, code: 'dnsFail' };
-  if (!found.length) return { ok: false, code: 'missing', found: [] };
-  // accept the bare token too — some panels strip the "key=" part
-  const hit = found.some(v => v === want || v === token || v.replace(/\s/g, '') === want);
-  return hit ? { ok: true, code: 'verified', found }
-             : { ok: false, code: 'mismatch', found };
+  if (!found.length) {
+    const fallback = [];
+    try {
+      const alt = String(window?.localStorage?.getItem?.('apb_domain_verify_' + domain) || '');
+      if (alt) fallback.push(alt);
+    } catch (e) {}
+    return { ok: false, code: 'missing', found: fallback };
+  }
+  const normalized = found.map(v => String(v || '').trim());
+  const hit = normalized.some(v => v === want || v === token || v.replace(/\s/g, '') === want || v.includes(token));
+  try {
+    if (hit) window?.localStorage?.setItem?.('apb_domain_verify_' + domain, want);
+  } catch (e) {}
+  return hit ? { ok: true, code: 'verified', found: normalized }
+             : { ok: false, code: 'mismatch', found: normalized };
 }
 
 /* ---------- the map ---------- */
