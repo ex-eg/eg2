@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="elgoharyX">
+  <title>elgoharyX</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16203A"/><stop offset="1" stop-color="#060B16"/>
+    </linearGradient>
+    <linearGradient id="gem" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FBF6E9"/><stop offset=".45" stop-color="#ECD08A"/>
+      <stop offset="1" stop-color="#D0AA4E"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <g transform="translate(8 8)">
+    <path d="M14 10 H34 L40 18 L24 40 L8 18 Z" fill="url(#gem)"/>
+    <g stroke="#060B16" stroke-opacity=".5" stroke-width="1.7" stroke-linecap="round">
+      <path d="M14 10 L40 18"/><path d="M34 10 L8 18"/>
+    </g>
+  </g>
+</svg>
