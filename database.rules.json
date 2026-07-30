@@ -174,9 +174,9 @@
         "updatedAt": { ".validate": "newData.isNumber()" },
 
         "//custom domain": "domain = the verified hostname serving this blog; domainPending = awaiting TXT proof; domainToken = the proof value. The public host->blog map lives under /domains.",
-        "domain":        { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 253 && newData.val().matches(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?([.][a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/))" },
-        "domainPending": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 253 && newData.val().matches(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?([.][a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/))" },
-        "domainToken":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64 && newData.val().matches(/^[A-Za-z0-9]+$/))" },
+        "domain":        { ".validate": "!newData.exists() || newData.isString()" },
+        "domainPending": { ".validate": "!newData.exists() || newData.isString()" },
+        "domainToken":   { ".validate": "!newData.exists() || newData.isString()" },
 
         "posts": {
           "$i": {
