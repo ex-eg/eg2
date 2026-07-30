@@ -3,8 +3,19 @@
    then refreshes the cache in the background. This prevents the long "hang" that
    network-first caused when the network stalled. Firebase / cross-origin traffic
    is never intercepted, so live data always comes fresh from the database. */
-const CACHE = 'elgoharyx-v60';
-const CORE = ['./', './index.html', './assets/styles.css', './assets/app.js', './assets/firebase.js', './assets/core.js', './assets/imagehost.js', './assets/site.js', './assets/fx.js', './assets/pwa.js', './assets/ads.js', './assets/promo.js', './assets/i18n.js', './explore.html', './hub.html'];
+const CACHE = 'elgoharyx-v61';
+const CORE = [
+  './', './index.html',
+  './assets/brand.css', './assets/styles.css',
+  './assets/app.js', './assets/firebase.js', './assets/core.js', './assets/brand.js',
+  './assets/domains.js', './assets/imagehost.js', './assets/site.js',
+  './assets/fx.js', './assets/pwa.js', './assets/consent.js', './assets/ads.js',
+  './assets/promo.js', './assets/i18n.js',
+  './assets/brand/favicon.svg', './assets/brand/favicon-32.png',
+  './explore.html', './hub.html', './blog.html', './profile.html',
+  './terms.html', './privacy.html', './cookies.html', './content-policy.html',
+  './contact.html', './custom-domain.html', './brand.html', './404.html'
+];
 
 self.addEventListener('install', e => {
   self.skipWaiting();

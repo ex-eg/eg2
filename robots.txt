@@ -1,4 +1,29 @@
+# elgoharyX — crawl policy
+#
+# Content pages are open. The account / builder / admin screens are client-side
+# shells with no publisher content: crawling them produced a set of near-empty
+# indexed URLs, which is read as "low value content". They are disallowed here
+# and additionally carry <meta name="robots" content="noindex, nofollow">.
+
 User-agent: *
+Allow: /
+
+Disallow: /login.html
+Disallow: /account.html
+Disallow: /admin.html
+Disallow: /premium.html
+Disallow: /hub.html
+Disallow: /my-blog.html
+Disallow: /my-profiles.html
+Disallow: /create-blog.html
+Disallow: /create-profile.html
+Disallow: /*?edit=
+Disallow: /*?blogedit=
+Disallow: /*?next=
+
+# AdSense needs to fetch any page it may serve an ad on, including the ones
+# above, so its crawler is exempted from the Disallow list.
+User-agent: Mediapartners-Google
 Allow: /
 
 Sitemap: https://ex-eg.github.io/sitemap.xml

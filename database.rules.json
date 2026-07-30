@@ -172,6 +172,12 @@
         "design":    { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 20)" },
         "createdAt": { ".validate": "!newData.exists() || newData.isNumber()" },
         "updatedAt": { ".validate": "newData.isNumber()" },
+
+        "//custom domain": "domain = the verified hostname serving this blog; domainPending = awaiting TXT proof; domainToken = the proof value. The public host->blog map lives under /domains.",
+        "domain":        { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 253 && newData.val().matches(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?([.][a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/))" },
+        "domainPending": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 253 && newData.val().matches(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?([.][a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/))" },
+        "domainToken":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64 && newData.val().matches(/^[A-Za-z0-9]+$/))" },
+
         "posts": {
           "$i": {
             "title": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 400)" },
@@ -192,6 +198,20 @@
           "updatedAt": { ".validate": "newData.isNumber()" },
           "$other":    { ".validate": false }
         }
+      }
+    },
+
+    "//domains": "Public host -> blog map for custom domains. Read must stay open: an anonymous visitor arriving on someone's own domain resolves it here before any auth exists. A key is the hostname with dots replaced by commas, because a Firebase key may not contain a dot. Writing requires that the caller owns the target blog, so nobody can hijack another blog's domain.",
+    "domains": {
+      ".read": true,
+      "$key": {
+        ".write": "auth != null && ( ( !data.exists() && root.child('blogs/' + newData.child('blog').val() + '/ownerUid').val() === auth.uid ) || ( data.exists() && ( data.child('uid').val() === auth.uid || root.child('config/adminEmail').val() === auth.token.email ) ) )",
+        ".validate": "$key.matches(/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(,[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/) && $key.length <= 253 && newData.hasChildren(['blog','uid','at'])",
+        "blog":     { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9]{1,64}$/)" },
+        "uid":      { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "at":       { ".validate": "newData.isNumber()" },
+        "verified": { ".validate": "!newData.exists() || newData.isBoolean()" },
+        "$other":   { ".validate": false }
       }
     },
 
