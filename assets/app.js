@@ -20,6 +20,12 @@ import {
   shortId, uniqueShortId, uniqueUserId, shorten
 } from './core.js';
 import { uploadToImgbb, loadImageKeys, saveImageKeys, clearImageKeysCache, currentImageKeys } from './imagehost.js';
+import {
+  safePhotoPosition as posSafe, safePhotoZoom as zoomSafe, photoStyle as imgStyle,
+  safeUrl, safeCssUrl as cssUrl, youtubeId as ytId, galleryItems as galleryArr,
+  videoItems as videosArr
+} from './profile-media.js';
+import { createQrModal } from './qr-modal.js';
 import { logVisit, startPresence, captureReferral, recordReferralIfPending, referralCount } from './site.js';
 import {
   isCustomHost, normalizeDomain, newDomainToken, txtRecordName, txtRecordValue,
@@ -152,9 +158,6 @@ import {
     <line x1="46" y1="25" x2="46" y2="34" stroke="rgba(230,201,128,.9)" stroke-width="1.5"/></svg>`;
 
   /* ---------- profile card renderer (shared, multi-layout) ---------- */
-  const posSafe=p=>/^[\d.]+%\s+[\d.]+%$/.test(p||'')?p:'50% 50%';
-  const zoomSafe=z=>{const n=parseFloat(z);return isFinite(n)?Math.max(1,Math.min(3,n)):1;};
-  const imgStyle=d=>`object-position:${posSafe(d.photoPos)};transform:scale(${zoomSafe(d.photoZoom)})`;
   function pfAvatar(d){
     const photo = d.photo ? `<img src="${esc(d.photo)}" alt="${esc(d.name)}" style="${imgStyle(d)}" onerror="this.remove()"/>` : esc(initials(d.name));
     const fr = (d.frame && /^[a-z0-9]{1,16}$/i.test(d.frame) && d.frame!=='none') ? ' pf-fr pf-fr-'+d.frame : '';
@@ -211,17 +214,11 @@ import {
       <div class="pf-est"><div class="en">${esc(d.universityEn||t('University','University'))}</div>
         <div class="ar">${esc(d.university||'')}${d.faculty?' — '+esc(d.faculty):''}</div></div></div>`;
   const photoOrInit=d=>d.photo?`<img src="${esc(d.photo)}" alt="${esc(d.name)}" style="${imgStyle(d)}" onerror="this.remove()"/>`:esc(initials(d.name));
-  const cssUrl=u=>String(u||'').replace(/["'()\\<>\s]/g,m=>encodeURIComponent(m));
   const detailRows=d=>[[t('الجامعة','University'),d.university],[t('التخصص','Specialization'),d.specialization],[t('الدرجة العلمية','Academic degree'),d.degree],[t('الاهتمامات البحثية','Research interests'),d.interests]].filter(r=>r[1]);
   const timelineItems=d=>detailRows(d).map(r=>`<div class="tl-item"><span class="tl-dot"></span><div class="tl-c"><div class="l">${esc(r[0])}</div><div class="v">${esc(r[1])}</div></div></div>`).join('');
   const detailsPlain=d=>[['university',d.university],['field',d.specialization],['degree',d.degree],['interests',d.interests]].filter(r=>r[1]).map(r=>`<span class="tk">${r[0]}</span><span class="tsep">:</span> ${esc(r[1])}`).join('<br>');
 
   /* ---------- media: image gallery + YouTube videos inside the profile ---------- */
-  const ytId=u=>{ const s=String(u||'').trim();
-    const m=s.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/))([\w-]{11})/);
-    return m?m[1]:(/^[\w-]{11}$/.test(s)?s:''); };
-  const galleryArr=d=>Array.isArray(d.gallery)?d.gallery.filter(u=>typeof u==='string'&&u.trim()):[];
-  const videosArr =d=>Array.isArray(d.videos)?d.videos.map(ytId).filter(Boolean):[];
   const hasMedia  =d=>galleryArr(d).length>0||videosArr(d).length>0;
   const pfGallery=d=>{ const a=galleryArr(d); if(!a.length) return '';
     return `<div class="pf-gallery">${a.map((u,i)=>`<a class="pf-gitem" href="${esc(safeUrl(u)||'#')}" target="_blank" rel="noopener" title="${t('عرض الصورة','View image')}"><img src="${esc(safeUrl(u))}" alt="${t('صورة','Image')} ${i+1}" loading="lazy" onerror="this.closest('.pf-gitem').remove()"/></a>`).join('')}</div>`; };
@@ -943,6 +940,8 @@ import {
     qr:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 14v.01M14 20v.01M20 20v.01M17 17v.01M20 17h.01M17 20h.01"/></svg>',
   };
 
+  const { openQR, closeQR } = createQrModal({ $, t, esc, toast, uploadIcon: IC2.up });
+
   /* ---------- account / profile page (edit account + avatar) ---------- */
   async function showAccount(){
     if(!currentUser){ gotoLogin(); return; }
@@ -1076,53 +1075,6 @@ import {
       console.error(e);
       $('#mpList').innerHTML=`<div class="mp-empty">${t('تعذّر تحميل البروفايلات. تحقّق من قواعد قاعدة البيانات.','Failed to load profiles. Check the database rules.')}</div>`;
     }
-  }
-
-  /* ---------- QR code generator (shared modal) ----------
-     Renders a QR for any public link (profile / blog) so the client can print it,
-     share it, or let visitors scan it. The image is produced by the free goqr.me
-     endpoint (CORS-enabled), then downloaded as a blob; if that fails we fall back
-     to opening the image directly. Needs an internet connection. */
-  const qrImgSrc=(url,size=440)=>'https://api.qrserver.com/v1/create-qr-code/?margin=12&size='+size+'x'+size+'&data='+encodeURIComponent(url);
-  function closeQR(){ const o=$('#qrOv'); if(o) o.remove(); }
-  function openQR(url, label){
-    closeQR();
-    const safeLabel = label ? String(label).slice(0,60) : t('رابط','Link');
-    const ov=document.createElement('div');
-    ov.id='qrOv';
-    ov.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);padding:18px';
-    ov.innerHTML=`<div class="qr-card" style="background:var(--panel,#fff);color:var(--txt,#111);max-width:400px;width:100%;border-radius:18px;padding:24px 22px;box-shadow:0 20px 60px rgba(0,0,0,.45);position:relative;border:1px solid var(--line,rgba(0,0,0,.12));text-align:center">
-      <button id="qrClose" title="${t('إغلاق','Close')}" style="position:absolute;top:12px;inset-inline-end:12px;background:none;border:none;font-size:22px;cursor:pointer;color:inherit;line-height:1">✕</button>
-      <h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;margin:2px 0 4px">${t('رمز QR','QR code')}</h3>
-      <p class="sub" style="margin-bottom:16px;word-break:break-word">${esc(safeLabel)}</p>
-      <div style="background:#fff;border-radius:14px;padding:14px;display:inline-block;box-shadow:0 4px 18px rgba(0,0,0,.12)">
-        <img id="qrImg" src="${esc(qrImgSrc(url))}" alt="QR" width="240" height="240" style="display:block;width:240px;height:240px;image-rendering:pixelated" onerror="this.parentElement.innerHTML='<div style=&quot;padding:40px;color:#b91c1c;font-size:13px&quot;>${t('تعذّر إنشاء الرمز — تحقّق من الاتصال','Could not create the code — check your connection')}</div>'"/>
-      </div>
-      <div style="display:flex;gap:8px;margin:16px 0 10px">
-        <input id="qrLink" value="${esc(url)}" readonly dir="ltr" style="flex:1;min-width:0;font-family:monospace;font-size:12px"/>
-        <button class="btn ghost" id="qrCopy" style="flex:0 0 auto">${t('نسخ','Copy')}</button>
-      </div>
-      <button class="btn primary" id="qrDl" style="width:100%">${IC2.up} ${t('تحميل الرمز (PNG)','Download code (PNG)')}</button>
-      <p class="sub" style="font-size:12px;margin-top:12px;opacity:.8">${t('اطبعه أو ضعه على بطاقتك — أي شخص يصوّره يفتح الرابط مباشرة.','Print it or add it to your card — anyone who scans it opens the link instantly.')}</p>
-    </div>`;
-    document.body.appendChild(ov);
-    $('#qrClose').onclick=closeQR;
-    ov.onclick=e=>{ if(e.target===ov) closeQR(); };
-    document.addEventListener('keydown',function esc0(e){ if(e.key==='Escape'){ closeQR(); document.removeEventListener('keydown',esc0); } });
-    $('#qrCopy').onclick=()=>{ try{ navigator.clipboard.writeText(url); }catch(e){ const i=$('#qrLink'); try{ i.select(); document.execCommand('copy'); }catch(_){}} toast(t('تم نسخ الرابط ✓','Link copied ✓')); };
-    $('#qrDl').onclick=async()=>{
-      const fname='elgoharyX-qr-'+String(safeLabel).replace(/[^\w؀-ۿ-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40).toLowerCase()+'.png';
-      try{
-        const r=await fetch(qrImgSrc(url,600));
-        if(!r.ok) throw new Error('bad');
-        const blob=await r.blob();
-        const a=document.createElement('a');
-        a.href=URL.createObjectURL(blob); a.download=fname||'elgoharyX-qr.png';
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(()=>URL.revokeObjectURL(a.href),4000);
-        toast(t('تم تحميل الرمز ✓','QR downloaded ✓'));
-      }catch(e){ window.open(qrImgSrc(url,600),'_blank','noopener'); }
-    };
   }
 
   /* ---------- workspace hub: all profiles + the blog in one screen ----------
@@ -1964,8 +1916,6 @@ import {
   };
   /* strip tags → plain text (safe, no script execution) for excerpts & word counts */
   function stripHTML(html){ try{ return (new DOMParser().parseFromString(String(html||''),'text/html').body.textContent||'').replace(/\s+/g,' ').trim(); }catch{ return String(html||'').replace(/<[^>]*>/g,' '); } }
-  /* only accept http(s) URLs for use in href/src — blocks javascript:/data:/vbscript: and other schemes */
-  const safeUrl = u => { const v=String(u==null?'':u).replace(/^[\u0000-\u0020]+/,''); return /^https?:\/\//i.test(v) ? v : ''; };
   const blogReadTime = body => { const w=stripHTML(body).split(/\s+/).filter(Boolean).length; return Math.max(1,Math.round(w/180))+t(' دقائق قراءة',' min read'); };
   /* public post list — hides unpublished drafts (published===false). Posts with no
      flag (legacy) are treated as published. Admin/builder use the raw array instead. */
@@ -5388,3 +5338,4 @@ import {
     window.elgPushPrompt = function(){ try{ window.OneSignalDeferred.push(function(OneSignal){ try{ OneSignal.Slidedown.promptPush(); }catch(e){ try{ OneSignal.Notifications.requestPermission(); }catch(x){} } }); }catch(e){} };
   }catch(e){ /* push init failed silently — site unaffected */ }
 })();
+
