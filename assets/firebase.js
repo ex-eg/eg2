@@ -20,13 +20,13 @@ import {
   getDatabase,
   ref as fbRef, child as fbChild, get as fbGet, set as fbSet,
   update as fbUpdate, remove as fbRemove,
-  increment, onDisconnect, onValue, serverTimestamp
+  increment, onDisconnect, onValue, serverTimestamp, runTransaction
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 
 /* value-only helpers pass straight through (they are sentinels / listeners, not paths) */
-export { increment, onDisconnect, onValue, serverTimestamp };
-export { GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+export { increment, onDisconnect, onValue, serverTimestamp, runTransaction };
+export { GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDynVoQRSD9icEcXfEz8Fdjms-sNd9gz9Y",

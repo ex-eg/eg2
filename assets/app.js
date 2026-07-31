@@ -6,8 +6,8 @@
    Everything imported below comes from them, so this file holds only the app's
    screens, router and logic. */
 import {
-  db, auth, ref, set, get, child, remove, update, increment,
-  GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut,
+  db, auth, ref, set, get, child, remove, update, increment, runTransaction,
+  GoogleAuthProvider, GithubAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
   captchaKeys, dbState, saveDbBackups, setActiveDb
 } from './firebase.js';
 import {
@@ -492,7 +492,6 @@ import {
       return 'x'+h.toString(16);
     }
   }
-  const hashPass=(salt,pass)=>sha256(salt+'::'+pass);
   const encEmail=e=>e.trim().toLowerCase().replace(/[.#$/\[\]]/g,',');
   async function emailToUid(email){
     try{ const s=await get(child(ref(db),'emails/'+encEmail(email))); return s.exists()?s.val():null; }catch{ return null; }
@@ -511,6 +510,14 @@ import {
      same visit is served from this local cache, sharply cutting database reads. */
   const cacheUser=u=>{ try{ localStorage.setItem(USER_KEY, JSON.stringify({uid:u.uid,username:u.username,email:u.email||'',photo:u.photo||'',premium:!!u.premium,createdAt:u.createdAt||0,freeTrialExpires:u.freeTrialExpires||0,cachedAt:Date.now()})); }catch{} };
   const getCachedUser=()=>{ try{ return JSON.parse(localStorage.getItem(USER_KEY)||'null'); }catch{ return null; } };
+  async function hydratePremium(){
+    if(!currentUser) return;
+    try{
+      const p=await getPremium(currentUser.uid);
+      currentUser.premium=premiumActive(p);
+      cacheUser(currentUser);
+    }catch(e){ currentUser.premium=false; }
+  }
 
   /* ---------- shared-link password protection ----------
      The creator can set an optional password. We store {viewSalt, viewPassHash}
@@ -686,7 +693,7 @@ import {
   }
   /* ---------- info pages (privacy / how-to / support) shown as a sheet ---------- */
   /*  ⚙️  عدّل بيانات التواصل بالأسفل بمعلوماتك الحقيقية  */
-  const SUPPORT = { email:'elgoharyx.help@gmail.com', whatsapp:'https://wa.me/00000000000' };
+  const SUPPORT = { email:'elgoharyx.help@gmail.com', whatsapp:'https://wa.me/201102052489' };
   const INFO = {
     howto:{
       icon:TAB.howto, title:t('كيفية إنشاء بروفايل','How to create a profile'),
@@ -729,7 +736,7 @@ import {
         <h4>${t('تواصل معنا','Contact us')}</h4>
         <div class="sup-links">
           <a class="sup-link" href="mailto:${SUPPORT.email}">${TAB.support}<span>${t('البريد الإلكتروني','Email')}<b>${esc(SUPPORT.email)}</b></span></a>
-          <a class="sup-link" href="${SUPPORT.whatsapp}" target="_blank" rel="noopener">${TAB.support}<span>${t('واتساب','WhatsApp')}<b>${t('تواصل مباشر','Direct contact')}</b></span></a>
+          ${SUPPORT.whatsapp?`<a class="sup-link" href="${SUPPORT.whatsapp}" target="_blank" rel="noopener">${TAB.support}<span>${t('واتساب','WhatsApp')}<b>${t('تواصل مباشر','Direct contact')}</b></span></a>`:''}
         </div>`
     }
   };
@@ -825,7 +832,8 @@ import {
         if(email){ try{ await set(ref(db,'emails/'+encEmail(email)), uid); }catch(e){} }
       }
       currentUser = { uid, email:rec.email||email, username:rec.username||t('مستخدم','User'), photo:rec.photo||'', createdAt:rec.createdAt||0, freeTrialExpires:rec.freeTrialExpires||0 };
-      saveSession(uid); cacheUser(currentUser);
+      await hydratePremium(); saveSession(uid); cacheUser(currentUser);
+      window.elgLoginCelebration?.();
       toast(t('تم تسجيل الدخول ✓','Signed in ✓')); route();
     }catch(e){
       console.error(e); if(err) err.textContent=oauthError(e);
@@ -850,7 +858,8 @@ import {
       if(em){ try{ await set(ref(db,'emails/'+encEmail(em)), uid); }catch(e){} }
     }
     currentUser={ uid, email:rec.email||em, username:rec.username||t('مستخدم','User'), photo:rec.photo||'', createdAt:rec.createdAt||0, freeTrialExpires:rec.freeTrialExpires||0 };
-    saveSession(uid); cacheUser(currentUser);
+    await hydratePremium(); saveSession(uid); cacheUser(currentUser);
+    window.elgLoginCelebration?.();
     toast(t('تم تسجيل الدخول ✓','Signed in ✓')); route();
   }
 
@@ -902,37 +911,17 @@ import {
           if(!/^[a-zA-Z0-9_\.؀-ۿ]{3,20}$/.test(uname)) throw {code:'bad-username'};
           if(await usernameTaken(uname.toLowerCase())) throw {code:'username-taken'};
           if(await emailToUid(email)) throw {code:'email-already-in-use'};
-          const uid=await uniqueUserId();
-          const salt=shortId(16);
-          const passHash=await hashPass(salt,pass);
+          const authResult=await createUserWithEmailAndPassword(auth,email,pass);
+          const uid=authResult.user.uid;
           const createdAt=Date.now();
-          await set(ref(db,'users/'+uid),{username:uname,email,salt,passHash,createdAt,freeTrialExpires:createdAt+30*24*3600*1000});
+          await set(ref(db,'users/'+uid),{username:uname,email,provider:'password',createdAt,freeTrialExpires:createdAt+30*24*3600*1000});
           await set(ref(db,'usernames/'+uname.toLowerCase()),uid);
           await set(ref(db,'emails/'+encEmail(email)),uid);
           currentUser={uid,email,username:uname,photo:'',createdAt,freeTrialExpires:createdAt+30*24*3600*1000};
           saveSession(uid); cacheUser(currentUser);
           toast(t('تم إنشاء الحساب ✓','Account created ✓')); route();
         }else{
-          // the admin must be a Firebase Auth account → always sign the admin email
-          // in through Firebase (even if a plain site account exists with that email)
-          if(adminEmail===undefined) await loadAdminEmail();
-          if(adminEmail && email.trim().toLowerCase()===adminEmail){ await firebaseEmailLogin(email, pass); return; }
-          const uid=await emailToUid(email);
-          if(!uid){
-            // no custom account with this email — try a Firebase Auth account
-            // (email/password users added in Firebase, e.g. the admin)
-            await firebaseEmailLogin(email, pass); return;
-          }
-          const rec=await loadUserRecord(uid);
-          if(!rec) throw {code:'user-not-found'};
-          const h=await hashPass(rec.salt||'',pass);
-          if(h!==rec.passHash){
-            // password didn't match the custom record — maybe it's a Firebase account
-            try{ await firebaseEmailLogin(email, pass); return; }catch(fb){ throw {code:'wrong-password'}; }
-          }
-          currentUser={uid,email:rec.email,username:rec.username,photo:rec.photo||'',createdAt:rec.createdAt||0,freeTrialExpires:rec.freeTrialExpires||0};
-          saveSession(uid); cacheUser(currentUser);
-          toast(t('تم تسجيل الدخول ✓','Signed in ✓')); route();
+          await firebaseEmailLogin(email, pass);
         }
       }catch(e){
         console.error(e); err.textContent=authError(e);
@@ -3496,10 +3485,32 @@ import {
   }
   const isAdmin = () => !!(currentUser && adminEmail && (currentUser.email||'').trim().toLowerCase()===adminEmail);
 
-  /* ---- admin panel password gate (hides the admin email behind a password
-     that the admin sets from inside the panel). Stored hashed in config/adminGate,
-     verified client-side; unlock is remembered for the browser session only. ---- */
-  const hashAdminPass = (salt,pass)=>sha256((salt||'')+'::admin::'+String(pass||''));
+  /* ---- admin panel TOTP gate ---- */
+  const B32='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const b32Encode=bytes=>{ let bits=0, value=0, out=''; for(const b of bytes){ value=(value<<8)|b; bits+=8; while(bits>=5){ out+=B32[(value>>>(bits-5))&31]; bits-=5; } } if(bits) out+=B32[(value<<(5-bits))&31]; return out; };
+  const b32Decode=s=>{ let bits=0,value=0,out=[]; for(const c of String(s||'').replace(/=+$/,'').toUpperCase()){ const n=B32.indexOf(c); if(n<0) continue; value=(value<<5)|n; bits+=5; if(bits>=8){ out.push((value>>>(bits-8))&255); bits-=8; } } return new Uint8Array(out); };
+  async function totpCode(secret,counter){
+    const key=await crypto.subtle.importKey('raw',b32Decode(secret),{name:'HMAC',hash:'SHA-1'},false,['sign']);
+    const buf=new ArrayBuffer(8), view=new DataView(buf); view.setUint32(4,Number(counter));
+    const mac=new Uint8Array(await crypto.subtle.sign('HMAC',key,buf)), offset=mac[mac.length-1]&15;
+    const n=((mac[offset]&127)<<24)|(mac[offset+1]<<16)|(mac[offset+2]<<8)|mac[offset+3];
+    return String(n%1000000).padStart(6,'0');
+  }
+  const totpCounter=()=>Math.floor(Date.now()/30000);
+  const newTotpSecret=()=>b32Encode(crypto.getRandomValues(new Uint8Array(20)));
+  const totpUri=(secret,email)=>'otpauth://totp/elgoharyX:'+encodeURIComponent(email||'admin')+'?secret='+secret+'&issuer=elgoharyX&algorithm=SHA1&digits=6&period=30';
+  let qrLibraryPromise=null;
+  const localQr=uri=>{
+    if(window.QRCode&&typeof window.QRCode.toDataURL==='function') return Promise.resolve(window.QRCode.toDataURL(uri,{width:240,margin:2}));
+    if(qrLibraryPromise) return qrLibraryPromise;
+    qrLibraryPromise=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js'; script.async=true;
+      script.onload=()=>window.QRCode&&window.QRCode.toDataURL?resolve(window.QRCode.toDataURL(uri,{width:240,margin:2})):reject(new Error('QR library unavailable'));
+      script.onerror=()=>reject(new Error('QR library failed')); document.head.appendChild(script);
+    });
+    return qrLibraryPromise;
+  };
   async function loadAdminGate(){
     try{ const s=await get(child(ref(db),'config/adminGate'));
       return s.exists() && s.val() && s.val().hash ? s.val() : null; }catch(e){ return null; }
@@ -3686,6 +3697,7 @@ import {
       loadAdminGate(), loadImageKeys(), loadCaptchaKeys(), loadEmailBackups()
     ]);
     const adminGateSet = !!adminGateObj;
+    const totpSet = !!(adminGateObj && adminGateObj.totpSecret);
     const dbInfo = dbState();                      // primary + backup DB URLs and active write index
     // "set admin email" + "panel password" cards
     const setupCard = () => `<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
@@ -3703,13 +3715,16 @@ import {
         `:`<div class="gate-note" style="display:block">${t('لتعيين الأدمن يجب تسجيل الدخول عبر','To set the admin you must sign in via')} <b>Google</b> (${t('حساب Firebase','Firebase account')}). ${t('اخرج ثم ادخل بزر «المتابعة بحساب Google» بنفس بريد الأدمن، ثم ارجع هنا واحفظه.','Sign out then sign in with the Continue with Google button using the same admin email, then come back here and save it.')}</div>`}
       </div>
       ${isAdmin()?`<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
-        <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">🔒 ${t('كلمة مرور لوحة الأدمن','Admin panel password')}</h3>
-        <div class="sub" style="margin-bottom:14px">${adminGateSet?t('اللوحة محمية بكلمة مرور — تُطلب عند فتح القسم لإخفاء بريد الأدمن. يمكنك تغييرها أو إزالتها.','The panel is password-protected — it is requested when opening the section to hide the admin email. You can change or remove it.'):t('أضف كلمة مرور لحماية اللوحة وإخفاء بريد الأدمن — تُطلب عند فتح هذا القسم.','Add a password to protect the panel and hide the admin email — it is requested when opening this section.')}</div>
-        <div class="field"><label>${t('كلمة المرور الجديدة','New password')}</label><input id="admPass1" type="password" dir="ltr" placeholder="${t('6 أحرف على الأقل','At least 6 characters')}" autocomplete="new-password"/></div>
-        <div class="field"><label>${t('تأكيد كلمة المرور','Confirm password')}</label><input id="admPass2" type="password" dir="ltr" placeholder="${t('أعد كتابتها','Re-enter it')}" autocomplete="new-password"/></div>
-        <button class="btn primary" id="admPassSave" style="width:100%">${adminGateSet?t('تغيير كلمة المرور','Change password'):t('حفظ كلمة المرور','Save password')}</button>
-        ${adminGateSet?`<button class="btn del" id="admPassRemove" style="width:100%;margin-top:8px">${t('إزالة كلمة المرور','Remove password')}</button>`:''}
-        <div class="pm-note" id="admPassMsg"></div>
+        <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">🔐 ${t('التحقق بخطوتين للوحة الأدمن','Admin panel two-factor authentication')}</h3>
+        <div class="sub" style="margin-bottom:14px">${adminGateObj&&adminGateObj.totpSecret?t('فعّل تطبيق المصادقة. كل رمز يعمل مرة واحدة فقط خلال نافذة زمنية واحدة.','Authenticator app protection is enabled. Each code works only once per time window.'):t('سيتم إلغاء كلمة المرور القديمة واستبدالها برمز من تطبيق Google Authenticator أو Microsoft Authenticator.','The old password will be replaced with a code from Google Authenticator or Microsoft Authenticator.')}</div>
+        ${adminGateObj&&adminGateObj.totpSecret?'':`<button class="btn primary" id="totpSetup" style="width:100%">${t('إنشاء رمز QR للمصادقة','Generate authenticator QR')}</button>
+        <div id="totpSetupBox" style="display:none;margin-top:14px;text-align:center">
+          <img id="totpQr" alt="${t('رمز إعداد المصادقة','Authenticator setup QR')}" style="width:240px;height:240px;background:#fff;padding:10px;border-radius:12px"/>
+          <p class="pm-note" dir="ltr" id="totpSecretText" style="word-break:break-all"></p>
+          <div class="field"><label>${t('أدخل الرمز الظاهر في التطبيق لتأكيد الإعداد','Enter the code shown in the app to confirm setup')}</label><input id="totpSetupCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" dir="ltr" style="text-align:center;letter-spacing:5px"/></div>
+          <button class="btn primary" id="totpSetupSave" style="width:100%">${t('تفعيل المصادقة','Enable authenticator')}</button>
+        </div>`}
+        <div class="pm-note" id="totpMsg"></div>
       </div>`:''}
       ${isAdmin()?`<div class="panel" style="max-width:600px;margin:0 auto 18px;padding:20px">
         <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:6px">🖼️ ${t('مفاتيح رفع الصور (imgbb)','Image upload keys (imgbb)')}</h3>
@@ -3778,23 +3793,27 @@ import {
         try{ await set(ref(db,'config/adminEmail'), em); adminEmail=em; try{ sessionStorage.setItem(ADMIN_EMAIL_KEY, em); }catch(e){} toast(t('تم حفظ بريد الأدمن ✓','Admin email saved ✓')); showAdmin(); }
         catch(e){ console.error(e); msg.className='pm-note'; msg.textContent=t('تعذّر الحفظ — لازم تكون داخل بجوجل، وتحفظ بريدك أنت (أول مرة) أو تكون الأدمن الحالي.','Failed to save — you must be signed in with Google and save your own email (first time) or be the current admin.'); b.disabled=false; b.textContent=old; }
       };
-      // save / change the panel password
-      const ps=$('#admPassSave');
-      if(ps) ps.onclick=async()=>{
-        const p1=($('#admPass1').value||''), p2=($('#admPass2').value||''), msg=$('#admPassMsg');
-        if(p1.length<6){ msg.className='pm-note'; msg.textContent=t('كلمة المرور 6 أحرف على الأقل','Password must be at least 6 characters'); return; }
-        if(p1!==p2){ msg.className='pm-note'; msg.textContent=t('كلمتا المرور غير متطابقتين','The passwords do not match'); return; }
-        ps.disabled=true; const old=ps.textContent; ps.textContent=t('جارٍ الحفظ…','Saving…');
-        try{ const salt=shortId(16); const hash=await hashAdminPass(salt,p1);
-          await set(ref(db,'config/adminGate'), { salt, hash, at:Date.now() });
-          markAdminUnlocked(); toast(t('تم حفظ كلمة المرور ✓','Password saved ✓')); showAdmin();
-        }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent=t('تعذّر الحفظ — تأكد أنك أدمن (Google) وأن القواعد المحدّثة منشورة','Failed to save — make sure you are the admin (Google) and the updated rules are published'); ps.disabled=false; ps.textContent=old; }
+      // replace the legacy password gate with a TOTP authenticator setup
+      let setupSecret='';
+      const setup=$('#totpSetup'), setupBox=$('#totpSetupBox'), setupSave=$('#totpSetupSave'), setupMsg=$('#totpMsg');
+      if(setup) setup.onclick=async()=>{
+        setupSecret=newTotpSecret();
+        const uri=totpUri(setupSecret,currentUser.email);
+        try{ $('#totpQr').src=await localQr(uri); }catch(e){ setupMsg.textContent=t('تعذّر إنشاء QR محليًا، استخدم المفتاح اليدوي أدناه','Could not create the local QR, use the manual key below'); }
+        $('#totpSecretText').textContent=t('المفتاح اليدوي: ','Manual key: ')+setupSecret;
+        setupBox.style.display='block'; setup.style.display='none'; $('#totpSetupCode').focus();
       };
-      // remove the panel password
-      const pr=$('#admPassRemove');
-      if(pr) pr.onclick=async()=>{ if(!confirm(t('إزالة كلمة مرور اللوحة؟ سيصبح بريد الأدمن ظاهراً لمن يفتح القسم.','Remove the panel password? The admin email will become visible to anyone who opens the section.')))return;
-        try{ await remove(ref(db,'config/adminGate')); clearAdminUnlock(); toast(t('تمت إزالة كلمة المرور','Password removed')); showAdmin(); }
-        catch(e){ console.error(e); toast(t('تعذّر — تأكد أنك أدمن','Failed — make sure you are the admin')); } };
+      if(setupSave) setupSave.onclick=async()=>{
+        const code=String($('#totpSetupCode').value||'').replace(/\D/g,'');
+        if(!setupSecret||!/^[0-9]{6}$/.test(code)){ setupMsg.textContent=t('أدخل رمزًا من 6 أرقام','Enter a 6-digit code'); return; }
+        setupSave.disabled=true; setupMsg.textContent=t('جارٍ التحقق…','Verifying…');
+        try{
+          const counter=totpCounter(), expected=await totpCode(setupSecret,counter);
+          if(code!==expected) throw new Error('invalid-totp');
+          await set(ref(db,'config/adminGate'),{totpSecret:setupSecret,lastCounter:counter,at:Date.now()});
+          markAdminUnlocked(); toast(t('تم تفعيل المصادقة الثنائية ✓','Two-factor authentication enabled ✓')); showAdmin();
+        }catch(e){ setupMsg.textContent=t('الرمز غير صحيح أو تعذّر الحفظ','Invalid code or save failed'); setupSave.disabled=false; }
+      };
       // image-upload keys: each key in its own box, with add / remove
       const list=$('#imgKeysList');
       const add=$('#imgKeysAdd');
@@ -3873,28 +3892,32 @@ import {
       };
     };
 
-    /* ---------- password gate (hides the admin email behind a password) ---------- */
-    if(adminGateSet && !adminUnlocked()){
+    /* ---------- one-time TOTP gate ---------- */
+    if(totpSet && !adminUnlocked()){
       $('#app').innerHTML = appbar('admin') + `<div class="wrap">
         <div class="lock-wrap"><div class="lock-card">
           <div class="lock-ic"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.4"/></svg></div>
-          <h2 class="lock-title">${t('لوحة الأدمن محمية بكلمة مرور','The admin panel is password-protected')}</h2>
-          <p class="lock-sub">${t('أدخل كلمة مرور لوحة الأدمن للمتابعة.','Enter the admin panel password to continue.')}</p>
+          <h2 class="lock-title">${t('أدخل رمز تطبيق المصادقة','Enter your authenticator code')}</h2>
+          <p class="lock-sub">${t('كل رمز صالح مرة واحدة فقط خلال نافذة الثلاثين ثانية.','Each code is valid only once during its 30-second time window.')}</p>
           <div class="lock-err" id="admGateErr"></div>
-          <div class="field"><input id="admGatePass" type="password" placeholder="${t('كلمة المرور','Password')}" autocomplete="off" style="text-align:center;letter-spacing:2px"/></div>
-          <button class="btn primary" id="admGateGo">${t('دخول','Enter')}</button>
+          <div class="field"><input id="admGateCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" dir="ltr" style="text-align:center;letter-spacing:6px"/></div>
+          <button class="btn primary" id="admGateGo">${t('تحقق ودخول','Verify and enter')}</button>
           <a class="lock-home" href="${urlHome()}">${t('العودة للرئيسية','Back to Home')}</a>
         </div></div>
       </div>` + drawer('admin');
       wireAppbar();
-      const inp=$('#admGatePass'), err=$('#admGateErr'), go=$('#admGateGo');
+      const inp=$('#admGateCode'), err=$('#admGateErr'), go=$('#admGateGo');
       const attempt=async()=>{
         err.textContent='';
-        const v=inp.value; if(!v){ err.textContent=t('أدخل كلمة المرور','Enter the password'); return; }
+        const v=String(inp.value||'').replace(/\D/g,''); if(!/^[0-9]{6}$/.test(v)){ err.textContent=t('أدخل رمزًا من 6 أرقام','Enter a 6-digit code'); return; }
         go.disabled=true; const old=go.textContent; go.textContent=t('جارٍ التحقق…','Verifying…');
-        const h=await hashAdminPass(adminGateObj.salt||'', v);
-        if(h===adminGateObj.hash){ markAdminUnlocked(); showAdmin(); }
-        else{ err.textContent=t('كلمة المرور غير صحيحة','Incorrect password'); go.disabled=false; go.textContent=old; inp.value=''; inp.focus(); }
+        try{
+          const counter=totpCounter(), expected=await totpCode(adminGateObj.totpSecret,counter);
+          if(v!==expected) throw new Error('invalid-totp');
+          const tx=await runTransaction(ref(db,'config/adminGate/lastCounter'),current=>Number(current||-1)>=counter?current:counter);
+          if(!tx.committed || Number(tx.snapshot.val())!==counter) throw new Error('totp-reused');
+          markAdminUnlocked(); showAdmin();
+        }catch(e){ err.textContent=t('الرمز غير صحيح أو تم استخدامه مسبقًا','Invalid or already-used code'); go.disabled=false; go.textContent=old; inp.value=''; inp.focus(); }
       };
       go.onclick=attempt;
       inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); attempt(); } });
@@ -4576,6 +4599,7 @@ import {
         const fresh=await loadUserRecord(uid);
         if(fresh){ const trialRec=await ensureFreeTrial(uid,fresh); currentUser={uid, email:trialRec.email||'', username:trialRec.username||t('مستخدم','User'), photo:trialRec.photo||'', createdAt:trialRec.createdAt||0, freeTrialExpires:trialRec.freeTrialExpires||0, premium:!!cached.premium}; cacheUser(currentUser); }
       }
+      await hydratePremium();
       await routeGuarded(); beginTracking();
       // touch the database at most ONCE per browser session; later pages use the cache
       if(!refreshed){
@@ -4592,6 +4616,7 @@ import {
     let rec=null;
     try{ rec=await Promise.race([loadUserRecord(uid), new Promise(r=>setTimeout(()=>r(null),8000))]); }catch(e){}
     if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||t('مستخدم','User'), photo:rec.photo||'', createdAt:rec.createdAt||0, freeTrialExpires:rec.freeTrialExpires||0}; cacheUser(currentUser); }
+    await hydratePremium();
     await routeGuarded(); beginTracking(); applyPrem();
   })();
 
@@ -4861,6 +4886,12 @@ import {
       S.cooldown[reason]=Date.now(); save(); addXp(n,reason); return true;
     }
     window.elgXP = function(n,reason){ try{ addXp(n||0, reason||'action'); }catch(e){} };
+    window.elgLoginCelebration = function(){
+      try{
+        confetti(); celebrate();
+        showCard('🎉', T('أهلاً بعودتك!','Welcome back!'), T('تم تسجيل الدخول بنجاح','You are signed in successfully'), true);
+      }catch(e){}
+    };
 
     /* ---------- floating orb + panel ---------- */
     function renderOrb(){
