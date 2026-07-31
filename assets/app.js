@@ -472,6 +472,12 @@ import {
   async function loadUserRecord(uid){
     try{ const s=await get(child(ref(db),'users/'+uid)); return s.exists()?s.val():null; }catch{ return null; }
   }
+  async function ensureFreeTrial(uid, rec){
+    if(!rec || rec.freeTrialExpires) return rec;
+    const freeTrialExpires=Date.now()+30*24*3600*1000;
+    try{ await update(ref(db,'users/'+uid), { freeTrialExpires }); }catch(e){}
+    return {...rec, freeTrialExpires};
+  }
   async function usernameTaken(name){
     try{ const s=await get(child(ref(db),'usernames/'+name)); return s.exists(); }catch{ return false; }
   }
@@ -503,7 +509,7 @@ import {
      a (possibly slow) network read of users/<uid>. We load the record from the
      database only ONCE per browser session (see init) — every later page in the
      same visit is served from this local cache, sharply cutting database reads. */
-  const cacheUser=u=>{ try{ localStorage.setItem(USER_KEY, JSON.stringify({uid:u.uid,username:u.username,email:u.email||'',photo:u.photo||'',premium:!!u.premium,cachedAt:Date.now()})); }catch{} };
+  const cacheUser=u=>{ try{ localStorage.setItem(USER_KEY, JSON.stringify({uid:u.uid,username:u.username,email:u.email||'',photo:u.photo||'',premium:!!u.premium,createdAt:u.createdAt||0,freeTrialExpires:u.freeTrialExpires||0,cachedAt:Date.now()})); }catch{} };
   const getCachedUser=()=>{ try{ return JSON.parse(localStorage.getItem(USER_KEY)||'null'); }catch{ return null; } };
 
   /* ---------- shared-link password protection ----------
@@ -810,13 +816,15 @@ import {
       const res = await signInWithPopup(auth, provider);
       const u = res.user, uid = u.uid, email = u.email || '';
       let rec = await loadUserRecord(uid);
+      if(rec) rec=await ensureFreeTrial(uid,rec);
       if(!rec){
         const uname = String(u.displayName || (email? email.split('@')[0] : 'user')).slice(0,40) || 'user';
-        rec = { username:uname, email, provider:which, photo:u.photoURL||'', createdAt:Date.now() };
+        const createdAt=Date.now();
+        rec = { username:uname, email, provider:which, photo:u.photoURL||'', createdAt, freeTrialExpires:createdAt+30*24*3600*1000 };
         await set(ref(db,'users/'+uid), rec);
         if(email){ try{ await set(ref(db,'emails/'+encEmail(email)), uid); }catch(e){} }
       }
-      currentUser = { uid, email:rec.email||email, username:rec.username||t('مستخدم','User'), photo:rec.photo||'' };
+      currentUser = { uid, email:rec.email||email, username:rec.username||t('مستخدم','User'), photo:rec.photo||'', createdAt:rec.createdAt||0, freeTrialExpires:rec.freeTrialExpires||0 };
       saveSession(uid); cacheUser(currentUser);
       toast(t('تم تسجيل الدخول ✓','Signed in ✓')); route();
     }catch(e){
@@ -834,12 +842,14 @@ import {
     const res = await signInWithEmailAndPassword(auth, email, pass); // throws on wrong credentials
     const u=res.user, uid=u.uid, em=u.email||email;
     let rec=await loadUserRecord(uid);
+    if(rec) rec=await ensureFreeTrial(uid,rec);
     if(!rec){
-      rec={ username:(u.displayName || (em.split('@')[0]) || t('مستخدم','User')).slice(0,40), email:em, provider:'password', createdAt:Date.now() };
+      const createdAt=Date.now();
+      rec={ username:(u.displayName || (em.split('@')[0]) || t('مستخدم','User')).slice(0,40), email:em, provider:'password', createdAt, freeTrialExpires:createdAt+30*24*3600*1000 };
       await set(ref(db,'users/'+uid), rec);
       if(em){ try{ await set(ref(db,'emails/'+encEmail(em)), uid); }catch(e){} }
     }
-    currentUser={ uid, email:rec.email||em, username:rec.username||t('مستخدم','User'), photo:rec.photo||'' };
+    currentUser={ uid, email:rec.email||em, username:rec.username||t('مستخدم','User'), photo:rec.photo||'', createdAt:rec.createdAt||0, freeTrialExpires:rec.freeTrialExpires||0 };
     saveSession(uid); cacheUser(currentUser);
     toast(t('تم تسجيل الدخول ✓','Signed in ✓')); route();
   }
@@ -895,10 +905,11 @@ import {
           const uid=await uniqueUserId();
           const salt=shortId(16);
           const passHash=await hashPass(salt,pass);
-          await set(ref(db,'users/'+uid),{username:uname,email,salt,passHash,createdAt:Date.now()});
+          const createdAt=Date.now();
+          await set(ref(db,'users/'+uid),{username:uname,email,salt,passHash,createdAt,freeTrialExpires:createdAt+30*24*3600*1000});
           await set(ref(db,'usernames/'+uname.toLowerCase()),uid);
           await set(ref(db,'emails/'+encEmail(email)),uid);
-          currentUser={uid,email,username:uname,photo:''};
+          currentUser={uid,email,username:uname,photo:'',createdAt,freeTrialExpires:createdAt+30*24*3600*1000};
           saveSession(uid); cacheUser(currentUser);
           toast(t('تم إنشاء الحساب ✓','Account created ✓')); route();
         }else{
@@ -919,7 +930,7 @@ import {
             // password didn't match the custom record — maybe it's a Firebase account
             try{ await firebaseEmailLogin(email, pass); return; }catch(fb){ throw {code:'wrong-password'}; }
           }
-          currentUser={uid,email:rec.email,username:rec.username,photo:rec.photo||''};
+          currentUser={uid,email:rec.email,username:rec.username,photo:rec.photo||'',createdAt:rec.createdAt||0,freeTrialExpires:rec.freeTrialExpires||0};
           saveSession(uid); cacheUser(currentUser);
           toast(t('تم تسجيل الدخول ✓','Signed in ✓')); route();
         }
@@ -3227,7 +3238,36 @@ import {
   /* ======================================================================
      PREMIUM / MANUAL PAYMENTS (InstaPay + Etisalat Cash, admin-approved)
      ====================================================================== */
-  const PREMIUM = { first:100, renew:150, months:3, instapay:'01102052415', etisalat:'01102052489' };
+  const PREMIUM = {
+    instapay:'01102052415', etisalat:'01102052489',
+    plans:[
+      {id:'starter', price:245, months:1, name:t('خطة البداية','Starter'), desc:t('لإنشاء بروفايل احترافي بسرعة.','For creating a professional profile quickly.'), features:[
+        t('بروفايل واحد بتصميم احترافي','1 professional profile'),
+        t('بدون إعلانات أثناء الاستخدام','Ad-free experience'),
+        t('شارة عضو مميز','Premium member badge')
+      ]},
+      {id:'creator', price:599, months:3, name:t('خطة المبدع','Creator'), desc:t('لأصحاب البروفايلات والمدونات الناشئة.','For growing profile and blog creators.'), features:[
+        t('حتى 3 بروفايلات','Up to 3 profiles'),
+        t('حتى 50 تصميماً للبروفايل والمدونة','Up to 50 profile and blog designs'),
+        t('معرض صور وفيديو داخل البروفايل','Photo and video gallery'),
+        t('روابط مشاركة نظيفة','Clean share links')
+      ]},
+      {id:'professional', price:1199, months:6, name:t('الخطة الاحترافية','Professional'), desc:t('للباحثين وصناع المحتوى المحترفين.','For professional researchers and creators.'), features:[
+        t('بروفايلات ومدونات غير محدودة','Unlimited profiles and blogs'),
+        t('كل التصاميم والألوان المتاحة','All available designs and colors'),
+        t('مؤثرات 3D وحركات الظهور','3D effects and entrance animations'),
+        t('أولوية الدعم الفني','Priority support')
+      ]},
+      {id:'elite', price:1993, months:12, name:t('خطة النخبة','Elite'), desc:t('أفضل قيمة لمن يريد حضوراً رقمياً كاملاً.','Best value for a complete digital presence.'), features:[
+        t('كل مزايا الخطة الاحترافية','Everything in Professional'),
+        t('مدونة احترافية مع البحث والقائمة الجانبية','Professional blog with search and sidebar'),
+        t('ربط دومين خاص بالمدونة','Custom domain for your blog'),
+        t('دعم وأولوية للمزايا الجديدة','Priority access to new features')
+      ]}
+    ],
+    first:245, renew:245, months:1
+  };
+  const premiumPlan = id => PREMIUM.plans.find(x=>x.id===id) || PREMIUM.plans[0];
 
   /* ▼▼▼ إشعار البريد للأدمن (EmailJS) — املأ القيم الأربعة من حسابك على emailjs.com ▼▼▼
      (المفاتيح دي عامة ومصمّمة تُستخدم في المتصفح، فمفيش خطر من ظهورها هنا) */
@@ -3370,7 +3410,7 @@ import {
     if(!_notifPopped){
       _notifPopped=true;
       if('Notification' in window && Notification.permission==='granted' && isSubscribed()){
-        fresh.slice(0,3).forEach(a=>{ try{ new Notification(a.title||t('إشعار جديد — elgoharyX','New notification — elgoharyX'),
+        fresh.filter(a=>a.device!==false).slice(0,3).forEach(a=>{ try{ new Notification(a.title||t('إشعار جديد — elgoharyX','New notification — elgoharyX'),
           { body:(a.body||'').slice(0,180), icon:LOGO, tag:'elgo-'+a.id }); }catch(e){} });
       }
     }
@@ -3475,6 +3515,10 @@ import {
   async function getPremium(uid){ try{ const s=await get(child(ref(db),'premium/'+uid)); return s.exists()?s.val():null; }catch(e){ return null; } }
   const premiumActive = p => !!(p && p.active && (!p.expires || p.expires>Date.now()));
   const isPremium = () => !!(currentUser && currentUser.premium);
+  const FREE_TRIAL_MS = 30*24*3600*1000;
+  const trialExpires = u => Number((u&&u.freeTrialExpires) || ((u&&u.createdAt) ? u.createdAt+FREE_TRIAL_MS : 0));
+  const freeTrialActive = () => !!(currentUser && trialExpires(currentUser)>Date.now());
+  const hasSiteAccess = () => isPremium() || freeTrialActive();
   /* designs/layouts unlocked by spending earned coins in the rewards store (client-side).
      Unlocks ONLY visual layouts/colors/blog-designs — NOT ad-free or the premium badge,
      so paid Premium keeps its value while coins let users unlock the look. */
@@ -3497,19 +3541,39 @@ import {
     wireAppbar();
     const p = await getPremium(currentUser.uid);
     const active = premiumActive(p);
-    const price = (p && p.count) ? PREMIUM.renew : PREMIUM.first;
+    let selectedPlan = premiumPlan(p && p.planId);
+    const price = () => selectedPlan.price;
     let shot='';
     const statusHtml = active
       ? `<div class="pm-status ok"><span class="pm-vip">${CROWN} ${t('عضو مميز','Premium member')}</span><span>${t('اشتراكك فعّال حتى','Your subscription is active until')} <b>${fmtDay(p.expires)}</b>. ${t('يمكنك التجديد بالأسفل.','You can renew below.')}</span></div>`
       : (p ? `<div class="pm-status off">${t('انتهى اشتراكك السابق — جدّده بالأسفل.','Your previous subscription has ended — renew it below.')}</div>` : '');
     $('#app').innerHTML = appbar('premium') + `<div class="wrap pm-wrap">
+      <style>
+        .pm-plans{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin:22px 0}
+        .pm-plan{display:flex;flex-direction:column;gap:10px;padding:18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);text-align:start;cursor:pointer;transition:.2s;position:relative}
+        .pm-plan:hover,.pm-plan.selected{border-color:var(--gold);box-shadow:0 10px 28px rgba(0,0,0,.16);transform:translateY(-3px)}
+        .pm-plan.selected{background:linear-gradient(145deg,rgba(208,170,78,.16),var(--panel))}
+        .pm-plan-badge{position:absolute;top:10px;inset-inline-end:10px;font-size:10px;color:var(--gold);font-weight:700}
+        .pm-plan h3{margin:0;font-size:20px}.pm-plan-desc{min-height:38px;color:var(--muted);font-size:12px;line-height:1.6}
+        .pm-plan-price{font-size:28px;font-weight:800;color:var(--gold)}.pm-plan-price small{font-size:12px;color:var(--muted);font-weight:500}
+        .pm-plan ul{list-style:none;padding:0;margin:0;display:grid;gap:7px;color:var(--muted);font-size:12px;line-height:1.5}
+        .pm-plan li::before{content:'✓';color:var(--gold);font-weight:800;margin-inline-end:6px}
+        @media(max-width:900px){.pm-plans{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @media(max-width:520px){.pm-plans{grid-template-columns:1fr}.pm-plan-desc{min-height:0}}
+      </style>
       <div class="pm-hero"><span class="pm-crown">${CROWN}</span>
         <h1>${t('الاشتراك المميز','Premium Subscription')}</h1>
-        <p>${t('استمتع بتجربة','Enjoy a')} <b>${t('بلا إعلانات نهائيًا','completely ad-free')}</b> ${t('على كامل الموقع، واحصل على شارة «عضو مميز»، وإزالة علامة elgoharyX من روابطك، ومزايا حصرية قادمة.','experience across the whole site, get the Premium member badge, remove the elgoharyX mark from your links, and enjoy exclusive perks coming soon.')}</p></div>
+        <p>${t('اختر الخطة المناسبة لك، واستمتع بمزايا مميزة تبدأ من 245 جنيهاً وتصل إلى 1993 جنيهاً.','Choose the plan that fits you, with premium features from EGP 245 up to EGP 1,993.')}</p></div>
       ${statusHtml}
+      <div class="pm-plans" id="pmPlans">${PREMIUM.plans.map((pl,i)=>`<button type="button" class="pm-plan${pl.id===selectedPlan.id?' selected':''}" data-plan="${pl.id}">
+        ${i===3?`<span class="pm-plan-badge">${t('أفضل قيمة','Best value')}</span>`:''}
+        <h3>${esc(pl.name)}</h3><div class="pm-plan-desc">${esc(pl.desc)}</div>
+        <div class="pm-plan-price">${pl.price} <small>${t('جنيه','EGP')} / ${pl.months} ${t(pl.months===1?'شهر':'أشهر',pl.months===1?'month':'months')}</small></div>
+        <ul>${pl.features.map(f=>`<li>${esc(f)}</li>`).join('')}</ul>
+      </button>`).join('')}</div>
       <div class="pm-perks-msg">
-        <span class="pm-pm-badge">${CROWN} ${t('كل مزايا العضوية المميزة','All premium membership perks')}</span>
-        <p>${t('عند اشتراكك تفتح لك هذه المزايا كاملةً على حسابك مباشرةً — إليك كل ما ستحصل عليه:','When you subscribe, all these perks unlock on your account instantly — here is everything you get:')}</p>
+        <span class="pm-pm-badge">${CROWN} <span id="pmSelectedName">${esc(selectedPlan.name)}</span></span>
+        <p>${t('المزايا التالية توضح ما تحصل عليه في الخطة المختارة:','The features below show what is included in the selected plan:')}</p>
       </div>
       <div class="pm-perks">
         <div class="pm-perk feature"><span class="pm-pk-ic">${AD_OFF_IC}</span>
@@ -3525,8 +3589,8 @@ import {
         <div class="pm-perk"><span class="pm-pk-ic">${PK_STAR_IC}</span>
           <div><b>${t('أولوية الدعم + مزايا حصرية قادمة','Priority support + exclusive perks coming')}</b><span>${t('أنت تدعم استمرار elgoharyX وتحصل على كل جديد أولًا.','You support keeping elgoharyX running and get everything new first.')}</span></div></div>
       </div>
-      <div class="pm-price"><b>${price}</b><span>${t('جنيه · لمدة 3 شهور','EGP · for 3 months')}</span>
-        <div class="pm-note2">${price===PREMIUM.renew?t('سعر التجديد','Renewal price'):t('سعر أول اشتراك','First subscription price')} — ${t('التجديد بعدها','Renewal afterwards')} ${PREMIUM.renew} ${t('ج','EGP')}</div></div>
+      <div class="pm-price"><b id="pmPrice">${price()}</b><span id="pmDuration">${t('جنيه · لمدة','EGP · for')} ${selectedPlan.months} ${t(selectedPlan.months===1?'شهر':'أشهر',selectedPlan.months===1?'month':'months')}</span>
+        <div class="pm-note2">${t('السعر حسب الخطة المختارة — يتم تفعيلها بعد مراجعة الإيصال.','Price follows the selected plan — it is activated after receipt review.')}</div></div>
       <div class="pm-card">
         <h3>${t('1) ادفع عبر إحدى الطريقتين','1) Pay via one of the two methods')}</h3>
         <div class="pm-method"><div class="pm-mname"><b>InstaPay</b><span>${t('انستا باي','InstaPay')}</span></div><span class="pm-num">${PREMIUM.instapay}</span><button class="btn ghost" data-copy="${PREMIUM.instapay}">${t('نسخ','Copy')}</button></div>
@@ -3542,10 +3606,19 @@ import {
         <div class="field"><label>${t('ملاحظة (اختياري)','Note (optional)')}</label><input id="pmNoteInp" placeholder="${t('اسم المُرسِل أو رقم العملية…','Sender name or transaction number…')}"/></div>
         <div class="pm-note" id="pmMsg"></div>
         <button class="btn primary" id="pmSend" style="width:100%">${t('إرسال الطلب للمراجعة','Send request for review')}</button>
-        <div class="pm-hint">${t('بعد مراجعة الأدمن والتأكد من المبلغ','After the admin reviews and confirms the amount')} (${price} ${t('ج','EGP')}) ${t('يُفعَّل اشتراكك خلال وقت قصير.','your subscription is activated shortly.')}</div>
+        <div class="pm-hint">${t('بعد مراجعة الأدمن والتأكد من المبلغ','After the admin reviews and confirms the amount')} (<span id="pmHintPrice">${price()}</span> ${t('ج','EGP')}) ${t('يُفعّل اشتراكك خلال وقت قصير.','your subscription is activated shortly.')}</div>
       </div>
     </div>` + drawer('premium');
     wireAppbar();
+    document.querySelectorAll('[data-plan]').forEach(card=>card.onclick=()=>{
+      selectedPlan=premiumPlan(card.dataset.plan);
+      document.querySelectorAll('[data-plan]').forEach(x=>x.classList.toggle('selected',x===card));
+      const name=$('#pmSelectedName'), amount=$('#pmPrice'), duration=$('#pmDuration'), hint=$('#pmHintPrice');
+      if(name) name.textContent=selectedPlan.name;
+      if(amount) amount.textContent=selectedPlan.price;
+      if(duration) duration.textContent=t('جنيه · لمدة','EGP · for')+' '+selectedPlan.months+' '+t(selectedPlan.months===1?'شهر':'أشهر',selectedPlan.months===1?'month':'months');
+      if(hint) hint.textContent=selectedPlan.price;
+    });
     document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{ navigator.clipboard?.writeText(b.dataset.copy); toast(t('تم نسخ الرقم ✓','Number copied ✓')); });
     const msg=$('#pmMsg');
     $('#pmUp').onclick=()=>$('#pmFile').click();
@@ -3564,9 +3637,9 @@ import {
         const id=shortId(14);
         const methodName=$('#pmMethod').value==='etisalat'?t('اتصالات كاش','Etisalat Cash'):t('انستا باي','InstaPay');
         const noteVal=($('#pmNoteInp').value||'').slice(0,500);
-        await set(ref(db,'paymentRequests/'+id), { uid:currentUser.uid, username:currentUser.username||'', email:currentUser.email||'', method:$('#pmMethod').value, amount:price, screenshot:shot, note:noteVal, status:'pending', createdAt:Date.now() });
+        await set(ref(db,'paymentRequests/'+id), { uid:currentUser.uid, username:currentUser.username||'', email:currentUser.email||'', method:$('#pmMethod').value, amount:price(), planId:selectedPlan.id, planName:selectedPlan.name, planMonths:selectedPlan.months, screenshot:shot, note:noteVal, status:'pending', createdAt:Date.now() });
         // notify the admin by email (EmailJS) — fire-and-forget so it never blocks the user
-        notifyAdminEmail({ to_email:EMAILJS.toEmail, username:currentUser.username||t('مستخدم','User'), email:currentUser.email||'', method:methodName, amount:String(price), note:noteVal||'—', screenshot:shot, link:pageUrl('admin.html') });
+        notifyAdminEmail({ to_email:EMAILJS.toEmail, username:currentUser.username||t('مستخدم','User'), email:currentUser.email||'', method:methodName, amount:String(price()), plan:selectedPlan.name, note:noteVal||'—', screenshot:shot, link:pageUrl('admin.html') });
         $('#app').querySelector('.pm-upload').innerHTML=`<div class="pm-done"><div class="ok">${CHECK}</div><h3>${t('تم استلام طلبك ✓','Your request has been received ✓')}</h3><p>${t('سيراجع الأدمن الإيصال ويؤكّد المبلغ، ثم يُفعَّل اشتراكك المميز. عُد لهذه الصفحة لاحقاً للاطمئنان.','The admin will review the receipt and confirm the amount, then your premium subscription is activated. Come back to this page later to check.')}</p></div>`;
         toast(t('تم إرسال طلب الاشتراك ✓','Subscription request sent ✓'));
       }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent=t('تعذّر الإرسال — تأكد من نشر القواعد','Failed to send — make sure the rules are published'); btn.disabled=false; btn.textContent=old; }
@@ -3574,13 +3647,14 @@ import {
   }
 
   /* grant / extend a premium subscription for a uid (shared by Payments + Users) */
-  async function adminGrantPremium(uid, done){
+  async function adminGrantPremium(uid, done, planId){
     try{
+      const plan=premiumPlan(planId);
       const cur=await getPremium(uid);
       const base=(cur && premiumActive(cur) && cur.expires)?cur.expires:Date.now();
-      const expires=base + PREMIUM.months*30*24*3600*1000;
+      const expires=base + plan.months*30*24*3600*1000;
       const count=((cur && cur.count)?cur.count:0)+1;
-      await set(ref(db,'premium/'+uid), { active:true, plan:String(count>1?PREMIUM.renew:PREMIUM.first), since:(cur&&cur.since)||Date.now(), expires, count });
+      await set(ref(db,'premium/'+uid), { active:true, planId:plan.id, plan:plan.name, amount:plan.price, months:plan.months, since:(cur&&cur.since)||Date.now(), expires, count });
       toast(t('تم تفعيل الاشتراك ✓','Subscription activated ✓')); done&&done();
     }catch(e){ console.error(e); toast(t('تعذّر التفعيل — تأكد أنك داخل بحساب الأدمن','Activation failed — make sure you are signed in with the admin account')); }
   }
@@ -4145,17 +4219,17 @@ import {
           <a class="adm-shot" href="${esc(safeUrl(r.screenshot)||'#')}" target="_blank">${safeUrl(r.screenshot)?`<img src="${esc(safeUrl(r.screenshot))}" alt="${t('إيصال','Receipt')}" loading="lazy"/>`:`<span>${t('لا صورة','No image')}</span>`}</a>
           <div class="adm-info">
             <div class="adm-top"><b>${esc(r.username||t('مستخدم','User'))}</b><span class="adm-amt">${Number(r.amount)||0} ${t('ج','EGP')}</span><span class="adm-badge ${esc(r.status||'pending')}">${r.status==='approved'?t('مفعّل','Approved'):r.status==='rejected'?t('مرفوض','Rejected'):t('قيد المراجعة','Pending')}</span></div>
-            <div class="adm-meta">${esc(r.email||'')} · ${r.method==='etisalat'?t('اتصالات كاش','Etisalat Cash'):t('انستا باي','InstaPay')} · ${fmtDay(r.createdAt)}</div>
+            <div class="adm-meta">${esc(r.email||'')} · ${esc(r.planName||t('الخطة الأساسية','Starter'))} · ${Number(r.amount)||0} ${t('ج','EGP')} · ${r.method==='etisalat'?t('اتصالات كاش','Etisalat Cash'):t('انستا باي','InstaPay')} · ${fmtDay(r.createdAt)}</div>
             ${r.note?`<div class="adm-note">📝 ${esc(r.note)}</div>`:''}
             <div class="adm-uid">UID: <code>${esc(r.uid)}</code></div>
-            ${r.status==='pending'?`<div class="adm-acts"><button class="btn primary" data-approve="${esc(r.id)}" data-uid="${esc(r.uid)}">${CHECK} ${t('تأكيد وتفعيل','Confirm and activate')}</button><button class="btn ghost" data-reject="${esc(r.id)}">${t('رفض','Reject')}</button></div>`:''}
+            ${r.status==='pending'?`<div class="adm-acts"><button class="btn primary" data-approve="${esc(r.id)}" data-uid="${esc(r.uid)}" data-plan="${esc(r.planId||'starter')}">${CHECK} ${t('تأكيد وتفعيل','Confirm and activate')}</button><button class="btn ghost" data-reject="${esc(r.id)}">${t('رفض','Reject')}</button></div>`:''}
           </div></div>`).join(''):`<div class="mp-empty">${t('لا توجد طلبات دفع بعد.','No payment requests yet.')}</div>`;
       el.innerHTML=`<div class="adm-subhead"><span class="pm-vip">${pending} ${t('قيد المراجعة','Pending')}</span></div><div class="adm-list">${rows}</div>`;
       el.querySelectorAll('[data-approve]').forEach(b=>b.onclick=async()=>{
-        const id=b.dataset.approve, uid=b.dataset.uid;
+        const id=b.dataset.approve, uid=b.dataset.uid, planId=b.dataset.plan;
         if(!confirm(t('تأكيد استلام المبلغ وتفعيل الاشتراك المميز لهذا المستخدم؟','Confirm receipt of the amount and activate premium subscription for this user?'))) return;
         b.disabled=true;
-        try{ await adminGrantPremium(uid); await set(ref(db,'paymentRequests/'+id+'/status'),'approved'); renderPayments(el); }
+        try{ await adminGrantPremium(uid, null, planId); await set(ref(db,'paymentRequests/'+id+'/status'),'approved'); renderPayments(el); }
         catch(e){ console.error(e); toast(t('تعذّر التفعيل','Activation failed')); b.disabled=false; }
       });
       el.querySelectorAll('[data-reject]').forEach(b=>b.onclick=async()=>{
@@ -4178,7 +4252,9 @@ import {
               <option value="one">${t('مستخدم واحد (بالبريد)','One user (by email)')}</option>
             </select></div>
           <div class="field" id="ntOneWrap" style="display:none"><label>${t('بريد المستخدم','User email')}</label><input id="ntOne" dir="ltr" placeholder="user@example.com"/></div>
+          <label class="adm-check"><input type="checkbox" id="ntDevice" checked/><span>${t('إرسال تنبيه إلى أجهزة المشتركين','Send a device notification to subscribers')}</span></label>
           <label class="adm-check"><input type="checkbox" id="ntEmail" checked/><span>${t('إرسال عبر البريد الإلكتروني أيضاً','Send via email too')}</span></label>
+          <div class="pm-note2">${t('سيظهر التنبيه على أجهزة المستخدمين الذين فعّلوا إشعارات الموقع عند فتح الموقع أو عودتهم إليه.','The alert appears on devices of users who enabled site notifications when they open or return to the site.')}</div>
           <div class="pm-note" id="ntMsg"></div>
           <button class="btn primary" id="ntSend" style="width:100%">📢 ${t('إرسال الإشعار','Send notification')}</button>
           <div class="pm-note2">${t('يظهر الإشعار داخل الموقع لكل مستخدم عبر جرس الإشعارات، ويُرسَل بالبريد عند تفعيل الخيار.','The notification appears inside the site for each user via the notification bell, and is sent by email when the option is enabled.')}</div>
@@ -4188,7 +4264,7 @@ import {
       $('#ntSend').onclick=async()=>{
         const title=($('#ntTitle').value||'').trim(), bodyv=($('#ntBody').value||'').trim(), msg=$('#ntMsg');
         if(!title){ msg.className='pm-note'; msg.textContent=t('اكتب عنوان الإشعار','Enter the notification title'); return; }
-        const aud=audSel.value, wantEmail=$('#ntEmail').checked;
+        const aud=audSel.value, wantEmail=$('#ntEmail').checked, wantDevice=$('#ntDevice').checked;
         const btn=$('#ntSend'); btn.disabled=true; const old=btn.textContent; btn.textContent=t('جارٍ الإرسال…','Sending…');
         try{
           let targetUid='all', recipients=[];
@@ -4204,11 +4280,11 @@ import {
             recipients=s&&s.exists()?Object.values(s.val()).filter(x=>x.email).map(x=>({email:x.email,username:x.username||''})):[];
           }
           const id=shortId(14);
-          await set(ref(db,'announcements/'+id), { title:title.slice(0,140), body:bodyv.slice(0,1000), uid:targetUid, by:(currentUser.email||'admin'), createdAt:Date.now() });
+          await set(ref(db,'announcements/'+id), { title:title.slice(0,140), body:bodyv.slice(0,1000), uid:targetUid, device:wantDevice, by:(currentUser.email||'admin'), createdAt:Date.now() });
           let sent=0;
           if(wantEmail && emailjsReady()){ for(const r of recipients){ if(await sendUserEmail(r.email,title,bodyv,r.username)) sent++; } }
           msg.className='pm-note ok';
-          msg.textContent = wantEmail ? (emailjsReady()?`✓ ${t('تم النشر داخل الموقع وإرسال','Published inside the site and sent')} ${sent} ${t('بريد','emails')}`:t('✓ تم النشر داخل الموقع (فعّل EmailJS لإرسال البريد)','✓ Published inside the site (enable EmailJS to send email)')) : t('✓ تم نشر الإشعار داخل الموقع','✓ Notification published inside the site');
+          msg.textContent = wantEmail ? (emailjsReady()?`✓ ${t('تم النشر وإرسال','Published and sent')} ${sent} ${t('بريد','emails')}${wantDevice?' · '+t('وتنبيه الأجهزة للمشتركين','device alert for subscribers'):''}`:t('✓ تم النشر داخل الموقع (فعّل EmailJS لإرسال البريد)','✓ Published inside the site (enable EmailJS to send email)')) : (wantDevice?t('✓ تم نشر التنبيه وإرساله لأجهزة المشتركين عند عودتهم للموقع','✓ Alert published for subscribed devices when they return to the site'):t('✓ تم نشر الإشعار داخل الموقع','✓ Notification published inside the site'));
           $('#ntTitle').value=''; $('#ntBody').value=''; toast(t('تم إرسال الإشعار ✓','Notification sent ✓')); loadNtList();
         }catch(e){ console.error(e); msg.className='pm-note'; msg.textContent=t('تعذّر الإرسال — تأكد من نشر القواعد وأنك أدمن','Failed to send — make sure the rules are published and you are the admin'); }
         finally{ btn.disabled=false; btn.textContent=old; }
@@ -4369,6 +4445,21 @@ import {
       <div class="err-actions"><button class="btn ghost" onclick="location.reload()">${t('إعادة المحاولة','Try again')}</button></div>
     </div></div>`;
   }
+  function showTrialExpiredPage(){
+    document.title=t('انتهت الخطة المجانية — elgoharyX','Free plan ended — elgoharyX');
+    setRobots(false); noAdsHere();
+    const app=document.getElementById('app'); if(!app) return;
+    app.innerHTML=appbar('premium')+`<div class="err-wrap"><div class="err-card">
+      <span class="err-logo">${tile({size:52,radius:17})}</span>
+      <div class="err-code">✦</div>
+      <span class="err-tag"><i></i>${t('الخطة المجانية انتهت','FREE PLAN ENDED')}</span>
+      <h2 class="err-title">${t('انتهت مدة الاستخدام المجاني','Your free access has ended')}</h2>
+      <p class="err-msg">${t('انتهت مدة خطتك المجانية لمدة 30 يوماً. اختر إحدى خطط البريميوم للمتابعة والاستفادة من الموقع.','Your 30-day free plan has ended. Choose a Premium plan to continue using the site.')}</p>
+      <div class="err-actions"><a class="btn primary" href="${pageUrl('premium.html')}">${CROWN} ${t('عرض خطط الاشتراك','View subscription plans')}</a>
+        <button class="btn ghost" data-act="logout">${t('تسجيل الخروج','Log out')}</button></div>
+    </div></div>`;
+    wireAppbar();
+  }
   /* which sections (or the whole site) are currently under maintenance */
   function maintActiveList(){
     if(!maintCfg) return [];
@@ -4417,6 +4508,13 @@ import {
     const anyMaint = maintActiveList().length>0;
     if(anyMaint && adminEmail===undefined) await loadAdminEmail();   // load so the admin can bypass + see the banner
     if(maintOn() && !isAdmin()){ showMaintenancePage(); return; }
+    const trialExempt = PAGE==='premium' || PAGE==='account' || PAGE==='admin';
+    if(currentUser && !freeTrialActive() && !trialExempt && !isAdmin()){
+      const pp=await getPremium(currentUser.uid);
+      currentUser.premium=premiumActive(pp);
+      cacheUser(currentUser);
+    }
+    if(currentUser && !hasSiteAccess() && !isAdmin() && !trialExempt){ showTrialExpiredPage(); return; }
     if(await routeCustomHost()){ showAdminMaintBanner(); return; }
     route();
     showAdminMaintBanner();
@@ -4429,7 +4527,28 @@ import {
       logVisit();
       startPresence({ uid: u&&u.uid, name: u&&u.username, page: PAGE||'home' });
       if(u&&u.uid){ recordReferralIfPending(u.uid); maybeReferralPopup(); }
+      premiumReminders();
     }catch(e){}
+  }
+  function premiumReminders(){
+    if(!currentUser) return;
+    const key='apb_premium_notice_'+new Date().toISOString().slice(0,10);
+    try{ if(localStorage.getItem(key)==='1') return; }catch(e){}
+    const send=(title,body)=>{
+      toast(title+' — '+body);
+      try{
+        if('Notification' in window && Notification.permission==='granted' && isSubscribed()) new Notification(title,{body,icon:LOGO,tag:'premium-reminder'});
+      }catch(e){}
+      try{ localStorage.setItem(key,'1'); }catch(e){}
+    };
+    getPremium(currentUser.uid).then(p=>{
+      const expiry=premiumActive(p)?Number(p.expires)||0:trialExpires(currentUser);
+      if(!expiry) return;
+      const days=Math.ceil((expiry-Date.now())/86400000);
+      if(days<=0) return;
+      if(premiumActive(p) && days<=7) send(t('تنبيه البريميوم','Premium reminder'),t('تبقّى '+days+' أيام على انتهاء اشتراكك.','Your subscription expires in '+days+' days.'));
+      else if(!premiumActive(p) && days<=7) send(t('تنبيه الخطة المجانية','Free plan reminder'),t('تبقّى '+days+' أيام على انتهاء خطتك المجانية.','Your free plan expires in '+days+' days.'));
+    }).catch(()=>{});
   }
   function maybeReferralPopup(){
     try{
@@ -4452,14 +4571,19 @@ import {
     const cached=getCachedUser();
     if(cached && cached.uid===uid){
       // instant render from the local cache — no database read needed
-      currentUser=cached; await routeGuarded(); beginTracking();
+      currentUser=cached;
+      if(!currentUser.freeTrialExpires){
+        const fresh=await loadUserRecord(uid);
+        if(fresh){ const trialRec=await ensureFreeTrial(uid,fresh); currentUser={uid, email:trialRec.email||'', username:trialRec.username||t('مستخدم','User'), photo:trialRec.photo||'', createdAt:trialRec.createdAt||0, freeTrialExpires:trialRec.freeTrialExpires||0, premium:!!cached.premium}; cacheUser(currentUser); }
+      }
+      await routeGuarded(); beginTracking();
       // touch the database at most ONCE per browser session; later pages use the cache
       if(!refreshed){
         try{ sessionStorage.setItem(REFRESH_KEY,'1'); }catch(e){}
         // refresh the user record first (preserving the cached premium flag so it isn't
         // reset to false), THEN refresh premium — running them concurrently let the
         // record write clobber the premium write, so an activated member stayed "free".
-        loadUserRecord(uid).then(rec=>{ if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||t('مستخدم','User'), photo:rec.photo||'', premium:(getCachedUser()||{}).premium}; cacheUser(currentUser); } }).then(applyPrem).catch(()=>{});
+        loadUserRecord(uid).then(rec=>{ if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||t('مستخدم','User'), photo:rec.photo||'', createdAt:rec.createdAt||0, freeTrialExpires:rec.freeTrialExpires||0, premium:(getCachedUser()||{}).premium}; cacheUser(currentUser); } }).then(applyPrem).catch(()=>{});
       }
       return;
     }
@@ -4467,7 +4591,7 @@ import {
     try{ sessionStorage.setItem(REFRESH_KEY,'1'); }catch(e){}
     let rec=null;
     try{ rec=await Promise.race([loadUserRecord(uid), new Promise(r=>setTimeout(()=>r(null),8000))]); }catch(e){}
-    if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||t('مستخدم','User'), photo:rec.photo||''}; cacheUser(currentUser); }
+    if(rec){ currentUser={uid, email:rec.email||'', username:rec.username||t('مستخدم','User'), photo:rec.photo||'', createdAt:rec.createdAt||0, freeTrialExpires:rec.freeTrialExpires||0}; cacheUser(currentUser); }
     await routeGuarded(); beginTracking(); applyPrem();
   })();
 
