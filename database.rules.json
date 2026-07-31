@@ -14,9 +14,11 @@
       "adminGate": {
         ".read": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
         ".write": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
-        ".validate": "newData.hasChildren(['salt','hash'])",
-        "salt": { ".validate": "newData.isString() && newData.val().length <= 64" },
-        "hash": { ".validate": "newData.isString() && newData.val().length <= 128" },
+        ".validate": "newData.hasChildren(['totpSecret']) || newData.hasChildren(['salt','hash'])",
+        "totpSecret": { ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^[A-Z2-7]{32}$/))" },
+        "lastCounter": { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0)" },
+        "salt": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 64)" },
+        "hash": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 128)" },
         "at":   { ".validate": "!newData.exists() || newData.isNumber()" },
         "$other": { ".validate": false }
       },
@@ -68,7 +70,10 @@
         ".write": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
         ".validate": "newData.hasChildren(['active'])",
         "active":   { ".validate": "newData.isBoolean()" },
+        "planId":   { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 32)" },
         "plan":     { ".validate": "!newData.exists() || newData.isString()" },
+        "amount":   { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0)" },
+        "months":   { ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 1 && newData.val() <= 120)" },
         "since":    { ".validate": "!newData.exists() || newData.isNumber()" },
         "expires":  { ".validate": "!newData.exists() || newData.isNumber()" },
         "count":    { ".validate": "!newData.exists() || newData.isNumber()" },
@@ -131,9 +136,9 @@
       ".read": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
       "$id": {
         ".read": true,
-        ".write": "auth != null && ( ( !data.exists() && newData.child('ownerUid').val() === auth.uid ) || ( data.exists() && ( data.child('ownerUid').val() === auth.uid || root.child('config/adminEmail').val() === auth.token.email ) ) )",
+        ".write": "auth != null && ( ( !data.exists() && newData.child('ownerUid').val() === auth.uid ) || ( data.exists() && ( ( data.child('ownerUid').val() === auth.uid && newData.child('ownerUid').val() === data.child('ownerUid').val() ) || root.child('config/adminEmail').val() === auth.token.email ) ) )",
         ".validate": "$id.matches(/^[A-Za-z0-9]{1,64}$/) && newData.hasChildren(['ownerUid','updatedAt'])",
-        "ownerUid":  { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "ownerUid":  { ".validate": "newData.isString() && newData.val().length <= 64 && ( !data.exists() || newData.val() === data.val() )" },
         "ownerName": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)" },
         "name":      { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 200)" },
         "role":      { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 2000)" },
@@ -162,9 +167,9 @@
       ".read": "auth != null && root.child('config/adminEmail').val() === auth.token.email",
       "$id": {
         ".read": true,
-        ".write": "auth != null && ( ( !data.exists() && newData.child('ownerUid').val() === auth.uid ) || ( data.exists() && ( data.child('ownerUid').val() === auth.uid || root.child('config/adminEmail').val() === auth.token.email ) ) )",
+        ".write": "auth != null && ( ( !data.exists() && newData.child('ownerUid').val() === auth.uid ) || ( data.exists() && ( ( data.child('ownerUid').val() === auth.uid && newData.child('ownerUid').val() === data.child('ownerUid').val() ) || root.child('config/adminEmail').val() === auth.token.email ) ) )",
         ".validate": "$id.matches(/^[A-Za-z0-9]{1,64}$/) && newData.hasChildren(['ownerUid','updatedAt'])",
-        "ownerUid":  { ".validate": "newData.isString() && newData.val().length <= 64" },
+        "ownerUid":  { ".validate": "newData.isString() && newData.val().length <= 64 && ( !data.exists() || newData.val() === data.val() )" },
         "ownerName": { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)" },
         "title":     { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 300)" },
         "subtitle":  { ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 1200)" },
@@ -173,7 +178,6 @@
         "createdAt": { ".validate": "!newData.exists() || newData.isNumber()" },
         "updatedAt": { ".validate": "newData.isNumber()" },
 
-        "//custom domain": "domain = the verified hostname serving this blog; domainPending = awaiting TXT proof; domainToken = the proof value. The public host->blog map lives under /domains.",
         "domain":        { ".validate": "!newData.exists() || newData.isString()" },
         "domainPending": { ".validate": "!newData.exists() || newData.isString()" },
         "domainToken":   { ".validate": "!newData.exists() || newData.isString()" },
@@ -201,7 +205,6 @@
       }
     },
 
-    "//domains": "Public host -> blog map for custom domains. Read must stay open: an anonymous visitor arriving on someone's own domain resolves it here before any auth exists. A key is the hostname with dots replaced by commas, because a Firebase key may not contain a dot. Writing requires that the caller owns the target blog, so nobody can hijack another blog's domain.",
     "domains": {
       ".read": true,
       "$key": {
